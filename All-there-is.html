@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All There Is</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+        #puddle {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+            display: block;
+        }
+        #hint {
+            position: fixed;
+            left: 50%;
+            bottom: 6vh;
+            transform: translateX(-50%);
+            color: #fff;
+            font: 500 12px/1 "Helvetica Neue", Arial, sans-serif;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            opacity: 0.6;
+            pointer-events: none;
+            transition: opacity 1.2s ease;
+        }
+        #hint.gone { opacity: 0; }
+    </style>
+</head>
+<body>
+    <canvas id="puddle"></canvas>
+    <div id="hint">Click to touch the water</div>
+
+    <script>
+    // ---------- SETTINGS (tweak these) ----------
+    const USE_IMAGE   = false;  // false = plain black background, true = use the photo below
+    const IMAGE_SRC   = "puddle.jpg";              // put your photo next to this file
+    const SOUND_SRC   = "water-drop-sound.mp3";    // your mp3, same folder
+    const SCALE       = 0.5;    // simulation resolution (0.5 = half size, faster)
+    const DAMPING     = 6;      // higher = ripples last longer (try 4–7)
+    const DROP_RADIUS = 16;     // size of the click splash (in sim pixels)
+    const DROP_FORCE  = 1400;   // strength of the click
+    const REFRACTION  = 0.09;   // how much the image bends
+    const SHINE       = 0.05;   // highlight on ripple crests
+    const CHROMA      = 0.35;   // color-fringe strength (0 = off)
+
+    // ---------- SETUP ----------
+    const canvas = document.getElementById("puddle");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const hint = document.getElementById("hint");
+
+    let w, h, size, src, out, outData, cur, prev;
+    const img = new Image();
+    let imgReady = false;
+
+    function drawSource(off) {
+        const c = off.getContext("2d");
+        if (USE_IMAGE && imgReady) {
+            // "cover" fit
+            const s = Math.max(w / img.width, h / img.height);
+            const dw = img.width * s, dh = img.height * s;
+            c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        } else {
+            c.fillStyle = "#000";
+            c.fillRect(0, 0, w, h);
+        }
+    }
+
+    function resize() {
+        canvas.width  = Math.max(2, Math.floor(window.innerWidth  * SCALE));
+        canvas.height = Math.max(2, Math.floor(window.innerHeight * SCALE));
+        w = canvas.width;
+        h = canvas.height;
+        size = w * h;
+
+        const off = document.createElement("canvas");
+        off.width = w; off.height = h;
+        drawSource(off);
+        src = off.getContext("2d").getImageData(0, 0, w, h).data;
+
+        out = ctx.createImageData(w, h);
+        outData = out.data;
+        cur  = new Int32Array(size);
+        prev = new Int32Array(size);
+    }
+
+    // ---------- WATER ----------
+    function drop(x, y) {
+        const r = DROP_RADIUS;
+        for (let j = -r; j <= r; j++) {
+            for (let i = -r; i <= r; i++) {
+                const px = x + i, py = y + j;
+                if (px < 1 || py < 1 || px >= w - 1 || py >= h - 1) continue;
+                const d = Math.sqrt(i * i + j * j);
+                if (d <= r) {
+                    // smooth dome, pushes the surface down
+                    cur[py * w + px] -= DROP_FORCE * (1 - d / r);
+                }
+            }
+        }
+    }
+
+    function step() {
+        for (let y = 1; y < h - 1; y++) {
+            let i = y * w + 1;
+            for (let x = 1; x < w - 1; x++, i++) {
+                let v = ((cur[i - 1] + cur[i + 1] + cur[i - w] + cur[i + w]) >> 1) - prev[i];
+                v -= v >> DAMPING;
+                prev[i] = v;
+            }
+        }
+        const t = cur; cur = prev; prev = t;
+    }
+
+    function clamp(v, max) { return v < 0 ? 0 : v > max ? max : v; }
+
+    function render() {
+        const wm = w - 1, hm = h - 1;
+        for (let y = 1; y < hm; y++) {
+            for (let x = 1; x < wm; x++) {
+                const i = y * w + x;
+                const dx = cur[i - 1] - cur[i + 1];
+                const dy = cur[i - w] - cur[i + w];
+                const ox = dx * REFRACTION, oy = dy * REFRACTION;
+
+                // sample each channel at a slightly different offset = color fringe
+                const rx = clamp((x + ox * (1 + CHROMA)) | 0, wm), ry = clamp((y + oy * (1 + CHROMA)) | 0, hm);
+                const gx = clamp((x + ox) | 0, wm),                gy = clamp((y + oy) | 0, hm);
+                const bx = clamp((x + ox * (1 - CHROMA)) | 0, wm), by = clamp((y + oy * (1 - CHROMA)) | 0, hm);
+
+                const shine = USE_IMAGE ? (dx + dy) * SHINE : (Math.abs(dx) + Math.abs(dy)) * SHINE * 1.5;
+                const o = i * 4;
+                outData[o]     = src[(ry * w + rx) * 4]     + shine;
+                outData[o + 1] = src[(gy * w + gx) * 4 + 1] + shine;
+                outData[o + 2] = src[(by * w + bx) * 4 + 2] + shine;
+                outData[o + 3] = 255;
+            }
+        }
+        ctx.putImageData(out, 0, 0);
+    }
+
+    function loop() {
+        step();
+        render();
+        requestAnimationFrame(loop);
+    }
+
+    // ---------- SOUND ----------
+    const dropSound = new Audio(SOUND_SRC);
+    dropSound.preload = "auto";
+    function playDrop() {
+        // clone so rapid clicks can overlap instead of cutting each other off
+        const s = dropSound.cloneNode();
+        s.volume = 0.8;
+        s.play().catch(() => {});
+    }
+
+    // ---------- INTERACTION ----------
+    canvas.addEventListener("pointerdown", (e) => {
+        const x = Math.floor(e.clientX * SCALE);
+        const y = Math.floor(e.clientY * SCALE);
+        drop(x, y);
+        playDrop();
+        hint.classList.add("gone");
+    });
+
+    window.addEventListener("resize", resize);
+
+    // ---------- START ----------
+    img.onload = () => { imgReady = true; resize(); };
+    img.onerror = () => { /* keeps fallback gradient */ };
+    if (USE_IMAGE) img.src = IMAGE_SRC;
+    resize();
+    loop();
+    </script>
+</body>
+</html>
