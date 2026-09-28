@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All There Is</title>
     <style>
+        @font-face {
+            font-family: "Firstland";
+            src: url("Firstland-Demo.otf") format("opentype"),
+                 url("Firstland%20Demo.otf") format("opentype");
+        }
         html, body {
             margin: 0;
             height: 100%;
@@ -20,14 +25,27 @@
             touch-action: none;
             display: block;
         }
+        #header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 28px 32px;
+            color: #e8e8e8;
+            font: 400 11px/1 "Courier New", Courier, monospace;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+        #header a { color: inherit; text-decoration: none; pointer-events: auto; }
         #hint {
             position: fixed;
             left: 50%;
             bottom: 6vh;
             transform: translateX(-50%);
             color: #fff;
-            font: 500 12px/1 "Helvetica Neue", Arial, sans-serif;
-            letter-spacing: 0.18em;
+            font: 400 11px/1 "Courier New", Courier, monospace;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             opacity: 0.6;
             pointer-events: none;
@@ -38,6 +56,11 @@
 </head>
 <body>
     <canvas id="puddle"></canvas>
+    <div id="header">
+        <span>Yue Xu</span>
+        <span>An interactive visual-audio experience</span>
+        <a href="#">About</a>
+    </div>
     <div id="hint">Click to touch the water</div>
 
     <script>
@@ -45,9 +68,12 @@
     const USE_IMAGE   = false;  // false = plain black background, true = use the photo below
     const IMAGE_SRC   = "puddle.jpg";              // put your photo next to this file
     const SOUND_SRC   = "water-drop-sound.mp3";    // your mp3, same folder
-    const SCALE       = 0.5;    // simulation resolution (0.5 = half size, faster)
+    const TITLE       = "All There Is";
+    const TITLE_COLOR = "#e8e8e8";
+    const TITLE_WIDTH = 0.92;   // title width as a fraction of the screen width
+    const SCALE       = 0.75;   // simulation resolution (lower = faster, higher = sharper text)
     const DAMPING     = 6;      // higher = ripples last longer (try 4–7)
-    const DROP_RADIUS = 16;     // size of the click splash (in sim pixels)
+    const DROP_RADIUS = 24;     // size of the click splash (in sim pixels)
     const DROP_FORCE  = 1400;   // strength of the click
     const REFRACTION  = 0.09;   // how much the image bends
     const SHINE       = 0.05;   // highlight on ripple crests
@@ -73,6 +99,16 @@
             c.fillStyle = "#000";
             c.fillRect(0, 0, w, h);
         }
+
+        // title lives inside the "water", so ripples bend it
+        c.fillStyle = TITLE_COLOR;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.font = "100px Firstland, cursive";
+        const measured = c.measureText(TITLE).width;
+        const fontSize = 100 * (w * TITLE_WIDTH) / measured;
+        c.font = fontSize + "px Firstland, cursive";
+        c.fillText(TITLE, w / 2, h / 2);
     }
 
     function resize() {
@@ -180,6 +216,7 @@
     img.onerror = () => { /* keeps fallback gradient */ };
     if (USE_IMAGE) img.src = IMAGE_SRC;
     resize();
+    document.fonts.load("100px Firstland").then(resize).catch(() => {});
     loop();
     </script>
 </body>
