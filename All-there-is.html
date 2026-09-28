@@ -47,11 +47,11 @@
             font: 400 11px/1 "Courier New", Courier, monospace;
             letter-spacing: 0.12em;
             text-transform: uppercase;
-            opacity: 0.6;
+            opacity: 0;
             pointer-events: none;
             transition: opacity 1.2s ease;
         }
-        #hint.gone { opacity: 0; }
+        #hint.show { opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -61,7 +61,7 @@
         <span>An interactive visual-audio experience</span>
         <a href="#">About</a>
     </div>
-    <div id="hint">Click to touch the water</div>
+    <div id="hint"></div>
 
     <script>
     // ---------- SETTINGS (tweak these) ----------
@@ -193,11 +193,19 @@
     // ---------- SOUND ----------
     const dropSound = new Audio(SOUND_SRC);
     dropSound.preload = "auto";
+    function showAudioError() {
+        hint.textContent = "Can't load " + SOUND_SRC + " \u2014 check the file name and folder";
+        hint.classList.add("show");
+    }
     function playDrop() {
-        // clone so rapid clicks can overlap instead of cutting each other off
-        const s = dropSound.cloneNode();
+        // a fresh Audio each click so rapid clicks overlap
+        const s = new Audio(SOUND_SRC);
         s.volume = 0.8;
-        s.play().catch(() => {});
+        s.addEventListener("error", showAudioError);
+        s.play().catch((err) => {
+            console.warn("Sound failed:", err);
+            if (err.name !== "NotAllowedError") showAudioError();
+        });
     }
 
     // ---------- INTERACTION ----------
@@ -206,7 +214,6 @@
         const y = Math.floor(e.clientY * SCALE);
         drop(x, y);
         playDrop();
-        hint.classList.add("gone");
     });
 
     window.addEventListener("resize", resize);
