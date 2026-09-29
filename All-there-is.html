@@ -7,8 +7,8 @@
     <style>
         @font-face {
             font-family: "Firstland";
-            src: url("Firstland-Demo.otf") format("opentype"),
-                 url("Firstland%20Demo.otf") format("opentype");
+            src: url("Firstland%20Demo.otf") format("opentype"),
+                 url("Firstland-Demo.otf") format("opentype");
         }
         html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
         #puddle {
@@ -60,27 +60,26 @@
 
     <script>
     // ---------- SETTINGS (tweak these) ----------
-    const TITLE        = "All There Is";
-    const TITLE_COLOR  = "#e8e8e8";
-    const TITLE_WIDTH  = 0.92;    // title width as a fraction of the screen width
-    const TITLE_FADE_MS = 2000;   // how long the title takes to fade once you start dragging
-    const REVEAL_MS    = 2500;    // how long each image takes to fade in
-    const MIN_BOX      = 24;      // smallest box (px) that counts as a frame
-    const FRAGMENT_MODE = false;  // false = whole photo fitted into the box; true = box acts as a window onto a full-screen photo
+    const TITLE         = "All There Is";
+    const TITLE_COLOR   = "#e8e8e8";
+    const TITLE_WIDTH   = 0.92;   // title width as a fraction of the screen width
+    const TITLE_FADE_MS = 2000;   // title fade-out time once you start dragging
+    const REVEAL_MS     = 2500;   // how long each image takes to fade in
+    const MIN_BOX       = 24;     // smallest box (px) that counts as a frame
+    const FRAGMENT_MODE = false;  // false = whole photo fitted into the box; true = box is a window onto a full-screen photo
 
-    // Photo ids. The page tries each id with a few folder / file-name variations
-    // (images/ or same folder; "-copy", " copy" or no suffix), so renaming won't break it.
-    const IMAGE_IDS = [
+    // Photos: same folder as this file. Change IMAGE_FOLDER (e.g. "images/") if you move them.
+    const IMAGE_FOLDER = "";
+    const IMAGES = [
         "img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg", "img5.jpg",
         "img6.jpg", "img7.jpg", "img8.jpg", "img9.jpg", "img10.jpg"
     ];
-    const IMAGE_FOLDERS = [""];
 
     const SOUND_SRC    = "water-drop-sound.mp3";
     const SCALE        = 0.75;    // water resolution (lower = faster, higher = sharper title)
-    const DAMPING      = 6;
-    const DROP_RADIUS  = 24;
-    const DROP_FORCE   = 1400;
+    const DAMPING      = 6;       // higher = ripples last longer
+    const DROP_RADIUS  = 24;      // click splash size
+    const DROP_FORCE   = 1400;    // click splash strength
     const REFRACTION   = 0.09;
     const SHINE        = 0.05;
     const CHROMA       = 0.35;
@@ -190,42 +189,35 @@
     }
 
     // ---------- SOUND ----------
+    function soundError() {
+        showMessage("Can't load " + SOUND_SRC + " \u2014 check the file name and folder");
+    }
     function playDrop() {
-        const s = new Audio(SOUND_SRC);
+        const s = new Audio(SOUND_SRC);       // new player each click so rapid clicks overlap
         s.volume = 0.8;
-        s.addEventListener("error", () => showMessage("Can't load " + SOUND_SRC + " \u2014 check the file name and folder"));
+        s.addEventListener("error", soundError);
         s.play().catch((err) => {
             console.warn("Sound failed:", err);
-            if (err.name !== "NotAllowedError") showMessage("Can't load " + SOUND_SRC + " \u2014 check the file name and folder");
+            if (err.name !== "NotAllowedError") soundError();
         });
     }
 
     // ---------- IMAGES ----------
-    const urls = [];   // filled in with whichever file names actually load
-    let pending = IMAGE_IDS.length;
+    const urls = [];           // photos that loaded successfully
+    let pending = IMAGES.length;
 
-    function candidatesFor(id) {
-        const names = [id];
-        const list = [];
-        IMAGE_FOLDERS.forEach((f) => names.forEach((n) => list.push(encodeURI(f + n))));
-        return list;
-    }
-
-    function findImage(id) {
-        const list = candidatesFor(id);
-        (function tryNext(i) {
-            if (i >= list.length) {
-                console.warn("No file found for " + id + ". Tried:", list);
-                if (--pending === 0 && !urls.length) showMessage("Can't find the photos \u2014 put them in an images folder next to index.html");
-                return;
+    IMAGES.forEach((name) => {
+        const url = encodeURI(IMAGE_FOLDER + name);
+        const im = new Image();
+        im.onload = () => { urls.push(url); pending--; };
+        im.onerror = () => {
+            console.warn("Photo not found:", url);
+            if (--pending === 0 && !urls.length) {
+                showMessage("Can't find the photos \u2014 check the file names and folder");
             }
-            const im = new Image();
-            im.onload = () => { urls.push(list[i]); pending--; };
-            im.onerror = () => tryNext(i + 1);
-            im.src = list[i];
-        })(0);
-    }
-    IMAGE_IDS.forEach(findImage);
+        };
+        im.src = url;
+    });
 
     // shuffled "bag": every photo appears once before any repeats
     let bag = [], last = null;
@@ -244,14 +236,14 @@
     }
 
     function revealImage(r) {
+        const u = nextImage();
+        if (!u) return;
         const p = document.createElement("div");
         p.className = "piece";
         p.style.left = r.x + "px";
         p.style.top = r.y + "px";
         p.style.width = r.w + "px";
         p.style.height = r.h + "px";
-        const u = nextImage();
-        if (!u) { showMessage("Photos not found \u2014 put them in an images folder next to index.html"); return; }
         p.style.backgroundImage = 'url("' + u + '")';
         if (FRAGMENT_MODE) p.style.backgroundAttachment = "fixed";
         p.style.transition = "opacity " + REVEAL_MS + "ms ease";
