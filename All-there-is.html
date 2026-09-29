@@ -205,7 +205,7 @@
     let pending = IMAGE_IDS.length;
 
     function candidatesFor(id) {
-        const names = [id + "-copy.JPG", id + " copy.JPG", id + ".JPG"];
+        const names = [id];
         const list = [];
         IMAGE_FOLDERS.forEach((f) => names.forEach((n) => list.push(encodeURI(f + n))));
         return list;
