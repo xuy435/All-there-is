@@ -9,6 +9,7 @@
             font-family: "Firstland";
             src: url("Firstland-Demo.otf") format("opentype"),
                  url("Firstland%20Demo.otf") format("opentype");
+            font-display: block;
         }
         html, body {
             margin: 0;
@@ -87,6 +88,7 @@
     let w, h, size, src, out, outData, cur, prev;
     const img = new Image();
     let imgReady = false;
+    let fontReady = false;   // title stays hidden until Firstland has loaded
 
     function drawSource(off) {
         const c = off.getContext("2d");
@@ -101,14 +103,16 @@
         }
 
         // title lives inside the "water", so ripples bend it
-        c.fillStyle = TITLE_COLOR;
-        c.textAlign = "center";
-        c.textBaseline = "middle";
-        c.font = "100px Firstland, cursive";
-        const measured = c.measureText(TITLE).width;
-        const fontSize = 100 * (w * TITLE_WIDTH) / measured;
-        c.font = fontSize + "px Firstland, cursive";
-        c.fillText(TITLE, w / 2, h / 2);
+        if (fontReady) {
+            c.fillStyle = TITLE_COLOR;
+            c.textAlign = "center";
+            c.textBaseline = "middle";
+            c.font = "100px Firstland, cursive";
+            const measured = c.measureText(TITLE).width;
+            const fontSize = 100 * (w * TITLE_WIDTH) / measured;
+            c.font = fontSize + "px Firstland, cursive";
+            c.fillText(TITLE, w / 2, h / 2);
+        }
     }
 
     function resize() {
@@ -223,7 +227,8 @@
     img.onerror = () => { /* keeps fallback gradient */ };
     if (USE_IMAGE) img.src = IMAGE_SRC;
     resize();
-    document.fonts.load("100px Firstland").then(resize).catch(() => {});
+    const fontDone = () => { fontReady = true; resize(); };
+    document.fonts.load("100px Firstland").then(fontDone, fontDone);
     loop();
     </script>
 </body>
