@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Under The Cortex</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&family=Fragment+Mono:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: "Firstland";
+            src: url("Firstland%20Demo.otf") format("opentype"),
+                 url("Firstland-Demo.otf") format("opentype");
+        }
+        /* Drop a Fragment Mono SC file into this folder and it is used automatically;
+           until then the page falls back to Fragment Mono from Google Fonts. */
+        @font-face {
+            font-family: "Fragment Mono SC";
+            src: url("FragmentMonoSC-Regular.otf") format("opentype"),
+                 url("FragmentMonoSC-Regular.ttf") format("truetype");
+        }
+        :root {
+            --edge: 32px;   /* gap from every screen edge */
+            --ui-font: 400 10px/1 "Fragment Mono SC", "Fragment Mono", "Courier New", monospace;
+        }
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #e8e8e8; }
+        body { animation: arrive 1.2s ease both; }   /* fade up from the black redirect screen */
+        @keyframes arrive { from { opacity: 0; } }
+        #header {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: space-between;
+            padding: var(--edge); color: #e8e8e8;
+            font: var(--ui-font);
+            letter-spacing: 0.12em; text-transform: uppercase;
+            pointer-events: none; z-index: 20;
+            transition: opacity 0.8s ease;
+        }
+        body.in-podcast #header { opacity: 0; visibility: hidden; transition: opacity 0.8s ease, visibility 0s 0.8s; }
+        #header button {
+            all: unset; cursor: pointer; pointer-events: auto;
+            text-underline-offset: 3px;
+        }
+        #header button:hover, #header button:focus-visible { text-decoration: underline; }
+
+        /* ---------- ABOUT PANEL ---------- */
+        #about-backdrop { position: fixed; inset: 0; z-index: 40; display: none; }
+        #about-backdrop.open { display: block; }
+        #about {
+            --title-size: clamp(90px, 15vh, 170px);
+            position: fixed; top: 0; right: 0; bottom: 0; z-index: 50;
+            width: clamp(320px, 28vw, 440px);
+            background: #000; color: #e8e8e8;
+            transform: translateX(calc(100% + var(--title-size)));   /* fully off screen, title included */
+            visibility: hidden;
+            transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s 1.4s;
+        }
+        #about.open {
+            transform: none; visibility: visible;
+            transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+        }
+        #about-bg {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            opacity: 0.45;   /* lower = darker image, easier to read */
+        }
+        #about-title {
+            position: absolute; left: 0; bottom: 8px;
+            font: 400 var(--title-size)/1 Firstland, cursive; white-space: nowrap;
+            transform-origin: left bottom;
+            transform: translateX(calc(var(--title-size) * 0.32)) rotate(-90deg);   /* runs up the panel's left edge */
+            pointer-events: none;
+        }
+        #about-close {
+            all: unset; cursor: pointer; display: block; margin-bottom: 14px;
+            font: 400 13px/1 "Fragment Mono SC", "Fragment Mono", monospace;
+            letter-spacing: 0.04em; text-transform: uppercase;
+            text-underline-offset: 3px;
+        }
+        #about-close:hover, #about-close:focus-visible { text-decoration: underline; }
+        #about-body {
+            position: absolute; top: 88px; bottom: var(--edge);
+            left: 28px; right: var(--edge);
+            overflow-y: auto;
+            font: 400 9px/1.35 "Fragment Mono SC", "Fragment Mono", monospace;
+            letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        #about-body p { margin: 0 0 1.35em; }
+        #about-body p.gap { margin-top: 3em; }
+        @media (max-width: 600px) {
+            #about { width: calc(100vw - 48px); }
+        }
+
+        /* ---------- INTRO TEXT ---------- */
+        /* The frame: a scrolling window between the header and Back to Home, so both always stay visible. */
+        /* The frame covers the whole screen, but during the intro text its top and bottom bands
+           (behind the header and Back to Home) are masked out, with a soft 48px fade.
+           In the podcast part the bands open up so the photos and text run edge to edge. */
+        @property --band { syntax: "<length>"; inherits: false; initial-value: 0px; }
+        #intro-frame {
+            --band: calc(var(--edge) * 2 + 10px);
+            position: fixed; inset: 0;
+            overflow-y: auto; scrollbar-width: none;
+            -webkit-mask-image: linear-gradient(transparent var(--band), #000 calc(var(--band) + 48px), #000 calc(100% - var(--band) - 48px), transparent calc(100% - var(--band)));
+                    mask-image: linear-gradient(transparent var(--band), #000 calc(var(--band) + 48px), #000 calc(100% - var(--band) - 48px), transparent calc(100% - var(--band)));
+            transition: --band 0.8s ease;
+        }
+        body.in-podcast #intro-frame { --band: -48px; }
+        #intro-frame::-webkit-scrollbar { display: none; }
+        #intro {
+            --size: clamp(22px, 5.3vw, 90px);   /* line breaks follow the design; long lines only wrap on narrow phones */
+            padding: calc(var(--edge) * 2 + 10px + var(--size) * 1.4) var(--edge) calc(var(--size) * 1.4) 11.5vw;
+            font: 400 var(--size)/1.15 Firstland, cursive;
+        }
+        #intro p { margin: 0 0 calc(var(--size) * 1.15); }
+        #intro p:last-child { margin-bottom: 0; }
+
+        /* ---------- PODCAST ---------- */
+        #podcast { position: relative; }
+        /* Photos stacked in a vertical line behind the transcript (built by the script below).
+           The whole column fades up out of black after the intro text and back to black at the end. */
+        #podcast-bg {
+            position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+            opacity: 0.6;   /* lower = darker photos, easier to read */
+            -webkit-mask-image: linear-gradient(transparent, #000 35vh, #000 calc(100% - 50vh), transparent);
+                    mask-image: linear-gradient(transparent, #000 35vh, #000 calc(100% - 50vh), transparent);
+        }
+        .tile {
+            position: absolute; left: 0; right: 0;
+            background-size: cover; background-position: center;
+        }
+        .tile.join {   /* every photo after the first fades in over the one above it */
+            -webkit-mask-image: linear-gradient(transparent, #000 var(--overlap));
+                    mask-image: linear-gradient(transparent, #000 var(--overlap));
+        }
+        .seam {        /* blur across each join, strongest in the middle */
+            position: absolute; left: 0; right: 0;
+            -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+            -webkit-mask-image: linear-gradient(transparent, #000 50%, transparent);
+                    mask-image: linear-gradient(transparent, #000 50%, transparent);
+        }
+        #podcast-content {
+            position: relative;
+            padding: 22vh 4.5vw 60vh;
+            font: 400 15px/1.25 "EB Garamond", Garamond, "Times New Roman", serif;
+            color: #f2f2f2;
+        }
+        /* "all there is." block: what this site is, before the podcast begins */
+        .site-intro { margin: 0 0 60vh 3vw; }
+        .site-intro h2 {
+            margin: 0 0 56px !important; text-align: left !important;
+            font: 400 clamp(40px, 5.2vw, 84px)/1.1 Firstland, cursive !important;
+        }
+        .site-intro p {
+            max-width: 46ch; margin: 0 0 1.2em;
+            font: 400 10px/1.25 "Fragment Mono", "Courier New", monospace;
+        }
+        .pod-head { text-align: center; }
+        .pod-head h1 {
+            margin: 0 0 18px; font: 400 clamp(44px, 5.8vw, 92px)/1.1 Firstland, cursive;
+        }
+        .pod-head p {
+            margin: 0; font: 400 13px/1.35 "Fragment Mono SC", "Fragment Mono", monospace;
+            letter-spacing: 0.06em; text-transform: uppercase;
+        }
+        .pod-head a { color: inherit; text-decoration: none; text-underline-offset: 3px; }
+        .pod-head a:hover, .pod-head a:focus-visible { text-decoration: underline; }   /* links to the original on APS */
+        #podcast h2 {   /* section subtitles */
+            margin: 160px 0 110px; text-align: center;
+            font: 400 clamp(32px, 4.2vw, 66px)/1.2 Firstland, cursive;
+        }
+        /* conversation: Ludmila on the left half, Dick on the right half */
+        .turn { width: calc(50% - 12px); margin-top: 48px; }
+        .turn.dd { margin-left: calc(50% + 12px); }
+        h2 + .turn { margin-top: 0; }
+        .turn h3 { margin: 0 0 1.25em; font: inherit; }
+        .turn p { margin: 0 0 1.25em; text-align: justify; hyphens: auto; }
+        .turn p:last-child { margin-bottom: 0; }
+        @media (max-width: 700px) {
+            .turn, .turn.dd { width: auto; margin-left: 0; }
+            .turn.dd { padding-left: 12%; }
+            #podcast h2 { margin: 110px 0 70px; }
+        }
+
+        #home {
+            position: fixed; left: var(--edge); bottom: var(--edge); z-index: 30;
+            color: #e8e8e8; font: var(--ui-font); text-decoration: none;
+            letter-spacing: 0.12em; text-transform: uppercase; text-underline-offset: 3px;
+        }
+        #home:hover, #home:focus-visible { text-decoration: underline; }
+        #home::before {   /* soft dark patch behind the label so it stays readable over the photos */
+            content: ""; position: absolute; inset: -9px -12px; z-index: -1; border-radius: 3px;
+            background: rgba(0, 0, 0, 0.55);
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+            opacity: 0; transition: opacity 0.8s ease;
+        }
+        body.in-podcast #home::before { opacity: 1; }
+
+        /* ---------- BOTTOM-RIGHT TOOLS (podcast part) ---------- */
+        #tools {
+            position: fixed; right: var(--edge); bottom: var(--edge); z-index: 30;
+            display: flex; align-items: center; gap: 15px;
+            opacity: 0; visibility: hidden; transition: opacity 0.8s ease, visibility 0s 0.8s;
+        }
+        body.in-podcast #tools { opacity: 1; visibility: visible; transition: opacity 0.8s ease; }
+        #tools::before {   /* same soft dark patch as Back to Home */
+            content: ""; position: absolute; inset: -8px -10px; z-index: -1; border-radius: 3px;
+            background: rgba(0, 0, 0, 0.55);
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        }
+        #gallery-link { display: block; width: 15px; height: 15px; background: #fff; }
+        #bg-change {
+            all: unset; display: block; width: 15px; height: 15px; cursor: pointer;
+            background: url("refresh.png") center / contain no-repeat;
+        }
+        #bg-change.spin { transition: transform 0.6s ease; transform: rotate(360deg); }
+        /* label that follows the cursor while hovering a tool */
+        #cursor-label {
+            position: fixed; z-index: 60; pointer-events: none; white-space: nowrap;
+            color: #e8e8e8; font: var(--ui-font); letter-spacing: 0.12em; text-transform: uppercase;
+            padding: 6px 8px; border-radius: 3px; background: rgba(0, 0, 0, 0.7);
+            opacity: 0; transition: opacity 0.2s ease;
+            transform: translate(calc(-100% - 12px), calc(-100% - 10px));   /* sits up-left of the pointer */
+        }
+        #cursor-label.show { opacity: 1; }
+        .tile-next { position: absolute; inset: 0; background-size: cover; background-position: center;
+                     opacity: 0; transition: opacity 1.2s ease; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <span>Yue Xu</span>
+        <span>An interactive visual experience about perception</span>
+        <button id="about-open" type="button">About</button>
+    </div>
+
+    <div id="intro-frame">
+    <main id="intro">
+        <p>A puddle shows you the street,</p>
+        <p>but only the part of it you<br>happen to be looking at.</p>
+        <p>Shift your angle,</p>
+        <p>wait for a different hour,</p>
+        <p>let the light change, and the<br>street it holds changes too.</p>
+        <p>We see the world the same<br>way.</p>
+        <p>What reaches us is shaped by<br>where we stand,<br>what we already know, and<br>what we hope to find.</p>
+        <p>It is rarely the whole of what<br>is there.</p>
+        <p>Every puddle is true, and<br>none of them is all there is.</p>
+    </main>
+
+    <section id="podcast">
+        <div id="podcast-bg" aria-hidden="true"></div>
+        <div id="podcast-content">
+        <section class="site-intro">
+            <h2>all there is.</h2>
+            <p>This website is a reading experience about how what we know changes what we see.</p>
+            <p>Below is a podcast “<em>Under The Cortex</em>”, a conversation between Ludmila Nunes and Dick Dubbelde, from the Association for Psychological Science, about research showing that knowing what an object is for affects how quickly and how finely we see it.</p>
+            <p>Alongside it are excerpts from John Berger’s <em>Ways of Seeing</em>, which looks at how knowledge and belief shape the way we look at images.</p>
+        </section>
+
+        <header class="pod-head">
+            <h1>under the cortex</h1>
+            <p><a href="https://www.psychologicalscience.org/news/utc-dec-22-seeing-objects.html" target="_blank" rel="noopener">What You Know Changes What and How You See<br>Association for Psychological Science, APS<br>December 15, 2022</a></p>
+        </header>
+
+        <h2>Can what we know change what we see?</h2>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>Can what we know about an object change the way we see it or the way we feel about it? If so, could that be because different brain areas process different features of an object, such as its use?</p>
+            <p>This is under the cortex.</p>
+            <p>I am Ludmila Nunes with the Association for Psychological Science to speak about how quickly we process different objects and how well we process them. I have with me Dick Double D from George Washington University, with Sarah Sharmstein, also from George Washington University. He co authored an article published in Psychological Science examining how semantic knowledge about objects, specifically tools and non tools, influences the way we process them. Dr. Dubbelde, thank you for joining me today.</p>
+            <p>Welcome to under the cortex.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Thank you. It’s great to be here. I’m I’m pretty excited about doing this. It sounds fun.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>I hope so. As we start, I would like to ask you what you set out to study and why.</p></div>
+
+        <h2>Two fields, one idea</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>So I am actually a recent graduate of the grad program here, so I just defended my dissertation recently, and this was an idea that I had in my first year of grad school. I was reading through a bunch of background literature about object semantics and the mechanisms of visual perception and attention. And I started to find a couple of things that seemed to connect. I found research saying that tools were generating activity in the parietal regions of the brain that things like nontools weren’t getting. And then I found other research saying that you have different kinds of neurons in the parietal regions versus the temporal regions. And I started to think these things might be connected. They might lead to you having different perceptions between semantic categories. In this case, tools like a hammer or a mug in the paper, anything that you’re using your hands with. And then the other category is non tools. So anything like a potted plant that typically when you see it, you don’t interact with it.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>So basically you started connecting different information from the neuroscience field. Like these objects are processed by different areas in the brain. These different areas have different types of cells, so they might be doing something differently in the way they’re processing these objects. And you connected that with information from cognitive psychology, semantic memory on how tools and non tools have different properties.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Yes.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>So what did you do? What was your procedure for this study?</p></div>
+
+        <h2>Circles with gaps and flickers</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>So another tent pole of the study that went into it was I found a paper where they had people look at just circles on a computer screen. And those circles could have either a small gap in them or they could flicker on the screen. And so then they had two measurements how easily people could detect that gap or how easily they could detect that flicker. And then what they manipulated was how the participants responded. And so they could either respond on a keyboard like we normally do in any kind of cognitive psychology experiment, or they would press buttons that were on the sides of the computer screen. And so their manipulation was whether participants hands were far away from the stimuli or very close to the stimuli. I read that paper and what I saw was tools and non tools. Tools are things that are near your hands. Non tools are things that are away from your hands. And so I adopted that paradigm. But now instead of having buttons on the computer or near the computer screen versus a keyboard, I had everybody just respond on the keyboard. What I manipulated instead was I took the circles out of that paradigm and I put in images of objects.</p></div>
+
+        <h2>Swapping circles for objects</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>So I had a group of tool objects that were all line drawings of different tools, like a mug, like a hammer. And then I had another group of line drawings that were all non tools. Like a potted plant, like a fan, like a lamp. A fire hydrant was another one of them. And it was the same procedure. There could be a gap and you would have to say if there was a gap or not.</p></div>
+
+        <h2>Detail vs. speed</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>The idea there being if you are seeing a non tool, then you’re primarily using the more temporal parts of your visual system. And those parts of the brain are very good at seeing details. And so we hypothesize that if you have a lot of activity there because you see a non tool, you should be a little bit better at seeing details. You should be better at detecting the spatial gap on those objects. The opposite, just like the research I was talking about earlier, if you see a tool, you get activity in the brief parts of your brain and those parts tend to be a little bit faster. There’s a different kind of neuron there. It has more myelin on the axons, so they end up being faster overall.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>The prediction with that was that if you see a tool, you get activity in the paragle. You should be better at detecting the flicker of the object when it flickers on the screen.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>And what did you find?</p></div>
+
+        <h2>Non-tools seen in finer detail</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>We found support for both of those hypotheses to varying degrees. So the non tool objects, when people saw those, they were better at detecting the little gaps in the objects. So it was as if they were seeing the non tool objects with higher detail. We didn’t originally find the same thing with the flickering on the screen. So when people saw tools, they weren’t better at detecting the flickering.</p></div>
+
+        <h2>Tools seen a little faster</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Through a couple of experiments, what we ended up finding though is when we went from a detection task like does the object flicker or does it not? To a discrimination task, how fast is it flickering? People were faster at reporting whether it was a short or a fast flicker when they saw a tool object. So just like when they saw the non tools, they were a little bit better at details. With the tools, our participants seem to be able to see those tools a little bit faster, so to speak.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>So you found support for your hypothesis?</p></div>
+
+        <h2>Not just the picture</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Yes, and we even extended it a little bit. So we replicated that original finding with a different set of objects, which were no longer line drawings, but they were instead more realistic full color images. We used all the same objects, but better images for each one. And we found the same results, which was a great replication. It wasn’t something unique about the specific images.</p></div>
+
+        <h2>Upside down, the effect disappears</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>We found two other controls we wanted to do. We wanted to make sure that this was actually semantic. We wanted to make sure that it was because the participants were seeing a non tool or a tool. And so what we did is we just turned all of the objects upside down to make them harder to recognize. There’s a lot of research, especially in, like, face perception, that faces are a lot harder to recognize when they’re upside down. This was actually a suggestion from Dr. Mitrov here at George Washington. He gave me this idea for this experiment. So we turned all the objects upside down with the idea that it would make them harder to recognize. And when we did that, the effect went away. So it did seem to be that this difference between non tools and tools was because of the semantic difference between those groups rather than anything else it could have been.</p></div>
+
+        <h2>Red light and the neurons</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>The last thing we did is this idea that neurons in the temporal regions are a little bit better at details and the ones in the prior regions are a little bit faster. I wanted to find some amount of evidence that it was actually those different kinds of cells. What I really wanted to do here was being the neuron nerd that I am, I wanted to connect these semantic things down to an actual neuron. And so I found this weird finding where the neurons in the Pryle, at least the visual neurons in the prideal regions, are inhibited by red light. There doesn’t really seem to be a reason for it. It’s just like an evolutionary quirk that this happens. But we reasoned that if we did our temporal task with a green background or a red background, that should change the strength of our effect. And we found that it did.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>That’s really cool.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Yeah. The results from that one were a little bit quizzical. We found that the red light actually increased the effect, but we were stunned to find that it modulated the effect at all.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>Yeah, that’s really interesting. Do you have plans to follow up on this research?</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Not currently, at least personally. As far as the lab, dr. Shamsin’s lab, they’re always doing this kind of semantic research. So almost definitely we’ll get to it eventually, but we’re not currently doing anything.</p></div>
+
+        <h2>What about objects that don't exist?</h2>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>About it because I was wondering what would happen if you used nonobjects. So basically, things that could be an object but don’t actually exist, so there’s no semantic knowledge about them or even using other categories, because here you used objects versus objects, but tools versus non tools, or if you use objects versus, for example, animals.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Yeah, so these were both ideas that we had in late 2019, early 2020. We were planning a virtual reality experiment where we would take unknown objects, like grieval kind of things, and we train participants to either interact with them in VR or not, and then see if we could generate this effect. Then obviously we couldn’t do that study.</p></div>
+
+        <h2>Where do animals fit?</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>And then the animal question is something that we haven’t considered looking into it more deeply. But it’s always been a question that’s been in the back of our heads, because another thing that the lab would study, and I’ve done some research on this too, is the perception of object size. And there are papers from Dr. Kunkel’s lab showing that you use different parts of the temporal cortex to perceive smaller objects versus larger objects. And then animal objects, like animate objects were always neither of those. They’re just kind of situated in the middle. And so that’s always been a question in the back of our heads. Like, animals aren’t really tools, but they’re not really non tools either. You’re going to interact with them more than a potted plant, but probably less than a hammer.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>So I’ve always been curious about that, but we haven’t looked at it.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>You’re just telling us about the relationship between object categories and cognitive processing. Can you think of any practical implications of this research?</p></div>
+
+        <h2>Small differences, big scale</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Yeah, this was a question I struggled with for a long time because I just like to talk about cells, and that’s kind of how I got into this. But what we’ve come to realize is that I think this has some real implications for enhanced displays. So the first thing that always comes to my mind, even though it’s not really a thing anymore, is like the Google Glasses, where they would pull up things. But now we’re starting to use virtual reality for all sorts of different things and pulling up different kinds of information that you would need in whatever environment. Like Iron Man in his helmet. And so for these sorts of augmented displays in things like driving or in surgery, something like that, these sorts of perceptual differences are going to be fairly small. If you see a bunch of tools in that display, you might be a little bit faster. If you see a bunch of non tools, you might be a little bit better at spatial details. But in an environment such as surgery, where small spatial details are super important, or in an environment like driving, where reaction time is super important, those little differences can add up, especially at the societal scale. So I think this and other research like this, like if we start to do these studies on how we perceive anime versus inanimate objects or if we can train an object to be a tool or not, I think that’s going to have real implications for how we are presenting information as we further incorporate it into our devices and our fields of vision.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>So implications not only for the user, but probably also how these environments and virtual reality and artificial intelligence are being designed.</p></div>
+
+        <h2>Seeing is for acting</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Absolutely. And also the artificial intelligence thing. Like as you get more and more into cog psych, you start to realize that we see things because they give us the opportunity to do different things in our environment. And so by understanding how these sorts of semantic categories fit into a human head and how we connect those two possibilities for action I’m not a computer scientist, but I feel like that could have applications for how we’re programming things like AI and robots too.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>That’s exactly what I talked to when I read your study. I’m also not a computer scientist, but it’s a real translation of how we use things onto how they are mapped onto our brain. And it seems like a very small difference. But that matters, right?</p></div>
+
+        <h2>Differences that exist for a reason</h2>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>And these are differences that exist for a reason. The parietal cortex is largely about connecting things like vision to action. And so it has evolved to be more myelinated. It’s evolved to be faster so that you can react as fast as possible. Temporal cortex, it evolved to be better at these sorts of detail perceptions so that we can tell different plants apart. We know which ones are poisonous and which ones aren’t. And it’s the kind of thing that fascinates me.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>Yeah, that’s really interesting. This is Ludmila Nunes with APS and I’ve been speaking to Dick Dubbelde from George Washington University, author in an article on how what we know changes what and how we see. Thank you so much for joining me today.</p></div>
+        <div class="turn dd"><h3>Dick Dubbelde:</h3>
+            <p>Absolutely. And thank you for inviting me. This was great. And I’m glad that people are interested in this article.</p></div>
+        <div class="turn ln"><h3>Ludmila Nunes:</h3>
+            <p>And if anyone is interested in reading this study or learning more, please visit our website. psychologicalscience.org.</p></div>
+        </div>
+    </section>
+    </div>
+
+    <a id="home" href="All-there-is.html">Back to Home</a>
+    <div id="tools">
+        <a id="gallery-link" href="Gallery.html" data-label="Open Photo gallery" aria-label="Open Photo gallery"></a>
+        <button id="bg-change" type="button" data-label="Change Background image" aria-label="Change Background image"></button>
+    </div>
+    <div id="cursor-label"></div>
+
+    <div id="about-backdrop"></div>
+    <aside id="about" aria-label="About" aria-hidden="true">
+        <div id="about-bg"></div>
+        <div id="about-title">All There Is</div>
+        <div id="about-body">
+            <button id="about-close" type="button">About</button>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p class="gap">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
+        </div>
+    </aside>
+
+    <script>
+    // Photos for the About panel background (same folder as this file)
+    const IMAGE_FOLDER = "";
+    const IMAGES = [
+        "img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg", "img5.jpg",
+        "img6.jpg", "img7.jpg", "img8.jpg", "img9.jpg", "img10.jpg"
+    ];
+
+    // ---------- PODCAST BACKGROUND ----------
+    // Photos join in one vertical line behind the transcript; each fades + blurs into the next.
+    const TILE_H  = 1.2;   // each photo's height, in frame heights
+    const OVERLAP = 0.45;  // how much neighbouring photos overlap (the blended join), in frame heights
+    const introFrame = document.getElementById("intro-frame");
+    const podcast = document.getElementById("podcast");
+    const podBg = document.getElementById("podcast-bg");
+    const tileOrder = [];  // photo for each tile; extended as needed, never the same photo twice in a row
+
+    function photoFor(i) {
+        while (tileOrder.length <= i) {
+            const bag = IMAGES.slice().sort(() => Math.random() - 0.5);
+            if (bag[0] === tileOrder[tileOrder.length - 1]) bag.push(bag.shift());
+            tileOrder.push(...bag);
+        }
+        return 'url("' + encodeURI(IMAGE_FOLDER + tileOrder[i]) + '")';
+    }
+
+    function loadNearbyPhotos() {   // only load photos as they come close to the screen
+        const fh = introFrame.clientHeight;
+        const top = introFrame.scrollTop - podcast.offsetTop - fh, bottom = top + fh * 4;
+        podBg.querySelectorAll(".tile:not(.loaded)").forEach((t) => {
+            const y = t.offsetTop;
+            if (y + t.offsetHeight > top && y < bottom) {
+                t.style.backgroundImage = t.dataset.src;
+                t.classList.add("loaded");
+            }
+        });
+    }
+    introFrame.addEventListener("scroll", loadNearbyPhotos, { passive: true });
+    setInterval(() => { loadNearbyPhotos(); updatePodcastMode(); }, 600);   // backup for jumps that skip the scroll event
+
+    let builtFor = "";
+    function buildPodcastBg() {
+        const fh = introFrame.clientHeight, total = podcast.offsetHeight;
+        const H = Math.round(fh * TILE_H), OV = Math.round(fh * OVERLAP), step = H - OV;
+        if (builtFor === fh + "x" + total) return;
+        builtFor = fh + "x" + total;
+        podBg.innerHTML = "";
+        podBg.style.setProperty("--overlap", OV + "px");
+        const n = Math.max(1, Math.ceil((total - OV) / step));
+        for (let i = 0; i < n; i++) {
+            const t = document.createElement("div");
+            t.className = i ? "tile join" : "tile";
+            t.style.top = i * step + "px"; t.style.height = H + "px";
+            t.dataset.src = photoFor(i);
+            podBg.appendChild(t);
+        }
+        for (let i = 1; i < n; i++) {
+            const s = document.createElement("div");
+            s.className = "seam";
+            s.style.top = i * step + "px"; s.style.height = OV + "px";
+            podBg.appendChild(s);
+        }
+        loadNearbyPhotos();
+    }
+    new ResizeObserver(buildPodcastBg).observe(podcast);
+
+    // ---------- BOTTOM-RIGHT TOOLS ----------
+    // Change the photo currently filling most of the screen to a different one (cross-fade).
+    document.getElementById("bg-change").addEventListener("click", (e) => {
+        const btn = e.currentTarget;
+        btn.classList.remove("spin"); void btn.offsetWidth; btn.classList.add("spin");
+        const tiles = [...podBg.querySelectorAll(".tile")];
+        const viewTop = introFrame.scrollTop - podcast.offsetTop, viewBottom = viewTop + introFrame.clientHeight;
+        let best = -1, bestVis = 0;
+        tiles.forEach((t, i) => {
+            const vis = Math.min(viewBottom, t.offsetTop + t.offsetHeight) - Math.max(viewTop, t.offsetTop);
+            if (vis > bestVis) { bestVis = vis; best = i; }
+        });
+        if (best < 0) return;
+        const avoid = [tileOrder[best - 1], tileOrder[best], tileOrder[best + 1]];
+        const pool = IMAGES.filter((n) => !avoid.includes(n));
+        tileOrder[best] = pool[Math.floor(Math.random() * pool.length)];
+        const url = 'url("' + encodeURI(IMAGE_FOLDER + tileOrder[best]) + '")';
+        const t = tiles[best], next = document.createElement("div");
+        next.className = "tile-next";
+        next.style.backgroundImage = url;
+        t.appendChild(next);
+        const img = new Image();
+        img.onload = () => {
+            next.style.opacity = 1;
+            setTimeout(() => { t.style.backgroundImage = url; t.dataset.src = url; next.remove(); }, 1300);
+        };
+        img.src = encodeURI(IMAGE_FOLDER + tileOrder[best]);
+    });
+
+    // Hover label that follows the cursor
+    const cursorLabel = document.getElementById("cursor-label");
+    document.querySelectorAll("#tools [data-label]").forEach((el) => {
+        el.addEventListener("mouseenter", () => { cursorLabel.textContent = el.dataset.label; cursorLabel.classList.add("show"); });
+        el.addEventListener("mouseleave", () => cursorLabel.classList.remove("show"));
+        el.addEventListener("mousemove", (e) => { cursorLabel.style.left = e.clientX + "px"; cursorLabel.style.top = e.clientY + "px"; });
+    });
+
+    // Podcast part: hide the header and open the frame once the podcast reaches mid-screen
+    function updatePodcastMode() {
+        const inPodcast = introFrame.scrollTop + introFrame.clientHeight * 0.5 > podcast.offsetTop;
+        document.body.classList.toggle("in-podcast", inPodcast);
+    }
+    introFrame.addEventListener("scroll", updatePodcastMode, { passive: true });
+    window.addEventListener("resize", buildPodcastBg);
+
+    // ---------- ABOUT PANEL ----------
+    const about = document.getElementById("about");
+    const aboutBg = document.getElementById("about-bg");
+    const aboutBackdrop = document.getElementById("about-backdrop");
+    let aboutLast = null;
+
+    function openAbout() {
+        const pool = IMAGES.filter((n) => n !== aboutLast);   // never the same photo twice in a row
+        aboutLast = pool[Math.floor(Math.random() * pool.length)];
+        aboutBg.style.backgroundImage = 'url("' + encodeURI(IMAGE_FOLDER + aboutLast) + '")';
+        about.classList.add("open"); aboutBackdrop.classList.add("open");
+        about.setAttribute("aria-hidden", "false");
+    }
+    function closeAbout() {
+        about.classList.remove("open"); aboutBackdrop.classList.remove("open");
+        about.setAttribute("aria-hidden", "true");
+    }
+    document.getElementById("about-open").addEventListener("click", openAbout);
+    document.getElementById("about-close").addEventListener("click", closeAbout);
+    aboutBackdrop.addEventListener("click", closeAbout);
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAbout(); });
+    </script>
+</body>
+</html>

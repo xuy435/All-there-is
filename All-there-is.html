@@ -4,11 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All There Is</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&display=swap" rel="stylesheet">
     <style>
         @font-face {
             font-family: "Firstland";
             src: url("Firstland%20Demo.otf") format("opentype"),
                  url("Firstland-Demo.otf") format("opentype");
+        }
+        /* Drop a Fragment Mono SC file into this folder and it is used automatically;
+           until then the page falls back to Fragment Mono from Google Fonts. */
+        @font-face {
+            font-family: "Fragment Mono SC";
+            src: url("FragmentMonoSC-Regular.otf") format("opentype"),
+                 url("FragmentMonoSC-Regular.ttf") format("truetype");
+        }
+        :root {
+            --edge: 32px;   /* gap from every screen edge */
+            --ui-font: 400 10px/1 "Fragment Mono SC", "Fragment Mono", "Courier New", monospace;
         }
         html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
         #puddle {
@@ -32,19 +46,99 @@
         #header {
             position: fixed; top: 0; left: 0; right: 0;
             display: flex; justify-content: space-between;
-            padding: 28px 32px; color: #e8e8e8;
-            font: 400 11px/1 "Courier New", Courier, monospace;
+            padding: var(--edge); color: #e8e8e8;
+            font: var(--ui-font);
             letter-spacing: 0.12em; text-transform: uppercase;
             pointer-events: none;
         }
-        #header a { color: inherit; text-decoration: none; pointer-events: auto; }
+        #header button {
+            all: unset; cursor: pointer; pointer-events: auto;
+            text-underline-offset: 3px;
+        }
+        #header button:hover, #header button:focus-visible { text-decoration: underline; }
+
+        /* ---------- ABOUT PANEL ---------- */
+        #about-backdrop { position: fixed; inset: 0; z-index: 40; display: none; }
+        #about-backdrop.open { display: block; }
+        #about {
+            --title-size: clamp(90px, 15vh, 170px);
+            position: fixed; top: 0; right: 0; bottom: 0; z-index: 50;
+            width: clamp(320px, 28vw, 440px);
+            background: #000; color: #e8e8e8;
+            transform: translateX(calc(100% + var(--title-size)));   /* fully off screen, title included */
+            visibility: hidden;
+            transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s 1.4s;
+        }
+        #about.open {
+            transform: none; visibility: visible;
+            transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+        }
+        #about-bg {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            opacity: 0.45;   /* lower = darker image, easier to read */
+        }
+        #about-title {
+            position: absolute; left: 0; bottom: 8px;
+            font: 400 var(--title-size)/1 Firstland, cursive; white-space: nowrap;
+            transform-origin: left bottom;
+            transform: translateX(calc(var(--title-size) * 0.32)) rotate(-90deg);   /* runs up the panel's left edge */
+            pointer-events: none;
+        }
+        #about-close {
+            all: unset; cursor: pointer; display: block; margin-bottom: 14px;
+            font: 400 13px/1 "Fragment Mono SC", "Fragment Mono", monospace;
+            letter-spacing: 0.04em; text-transform: uppercase;
+            text-underline-offset: 3px;
+        }
+        #about-close:hover, #about-close:focus-visible { text-decoration: underline; }
+        #about-body {
+            position: absolute; top: 88px; bottom: var(--edge);
+            left: 28px; right: var(--edge);
+            overflow-y: auto;
+            font: 400 9px/1.35 "Fragment Mono SC", "Fragment Mono", monospace;
+            letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        #about-body p { margin: 0 0 1.35em; }
+        #about-body p.gap { margin-top: 3em; }
+        @media (max-width: 600px) {
+            #about { width: calc(100vw - 48px); }
+        }
         #hint {
-            position: fixed; left: 50%; bottom: 6vh; transform: translateX(-50%);
-            color: #fff; font: 400 11px/1 "Courier New", Courier, monospace;
+            position: fixed; left: 50%; bottom: var(--edge); transform: translateX(-50%);
+            color: #fff; font: var(--ui-font);
             letter-spacing: 0.12em; text-transform: uppercase;
             opacity: 0; pointer-events: none; transition: opacity 1.2s ease;
         }
         #hint.show { opacity: 0.6; }
+        #info {
+            position: fixed; right: var(--edge); bottom: var(--edge);
+            display: flex; align-items: center; gap: 10px;
+        }
+        #info-dot {
+            width: 15px; height: 15px; padding: 0; border: 0; border-radius: 50%;
+            background: #fff; cursor: pointer; flex: none;
+        }
+        #info-text {
+            color: #e8e8e8; font: var(--ui-font);
+            letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+            opacity: 0; transition: opacity 0.6s ease; pointer-events: none;
+        }
+        #info.open #info-text { opacity: 1; }
+        @media (max-width: 600px) {
+            #info-text {
+                white-space: normal; line-height: 1.5; text-align: right;
+                max-width: calc(100vw - 2 * var(--edge) - 15px - 10px);
+            }
+        }
+        #redirect {
+            position: fixed; inset: 0; z-index: 100; background: #000;
+            display: flex; align-items: center; justify-content: center;
+            color: #e8e8e8; font: 400 clamp(18px, 2.6vw, 36px)/1.5 Firstland, cursive;
+            text-align: center; padding: 0 16px;
+            opacity: 0; pointer-events: none; transition: opacity 0.8s ease;
+        }
+        #redirect.show { opacity: 1; pointer-events: auto; }
     </style>
 </head>
 <body>
@@ -53,10 +147,26 @@
     <div id="frame"></div>
     <div id="header">
         <span>Yue Xu</span>
-        <span>An interactive visual-audio experience</span>
-        <a href="#">About</a>
+        <span>An interactive visual experience about perception</span>
+        <button id="about-open" type="button">About</button>
     </div>
     <div id="hint"></div>
+    <div id="info">
+        <span id="info-text">Drag a frame across almost the entire screen to see everything.</span>
+        <button id="info-dot" aria-label="Show hint"></button>
+    </div>
+    <div id="about-backdrop"></div>
+    <aside id="about" aria-label="About" aria-hidden="true">
+        <div id="about-bg"></div>
+        <div id="about-title">All There Is</div>
+        <div id="about-body">
+            <button id="about-close" type="button">About</button>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p class="gap">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
+        </div>
+    </aside>
+    <div id="redirect">Unlocked: the whole picture.<br>Redirecting to Under the Cortex…</div>
 
     <script>
     // ---------- SETTINGS (tweak these) ----------
@@ -64,8 +174,16 @@
     const TITLE_COLOR   = "#e8e8e8";
     const TITLE_WIDTH   = 0.92;   // title width as a fraction of the screen width
     const TITLE_FADE_MS = 2000;   // title fade-out time once you start dragging
+    const ABOUT_FADE_MS = 1400;   // title fade out / back in while the About panel opens / closes
     const REVEAL_MS     = 2500;   // how long each image takes to fade in
     const MIN_BOX       = 24;     // smallest box (px) that counts as a frame
+    const REDIRECT_COVER = 0.85;  // a box covering this fraction of the screen (or more) leaves the page
+    const REDIRECT_URL   = "Under-the-cortex.html";
+    // big-frame sequence (total = sum of these four, 5s)
+    const BIG_REVEAL_MS  = 600;   // image fades in
+    const IMAGE_HOLD_MS  = 1000;  // image stays as-is
+    const ZOOM_MS        = 1400;  // image grows to full screen while black + text fade in over it
+    const REDIRECT_MS    = 2000;  // fully black "Redirecting" screen shows before leaving
     const FRAGMENT_MODE = false;  // false = whole photo fitted into the box; true = box is a window onto a full-screen photo
 
     // Photos: same folder as this file. Change IMAGE_FOLDER (e.g. "images/") if you move them.
@@ -78,7 +196,8 @@
     const SOUND_SRC    = "water-drop-sound.mp3";
     const SCALE        = 0.75;    // water resolution (lower = faster, higher = sharper title)
     const DAMPING      = 6;       // higher = ripples last longer
-    const DROP_RADIUS  = 24;      // click splash size
+    const DROP_RADIUS_MIN = 8;    // click splash size: each click picks a random size in this range
+    const DROP_RADIUS_MAX = 44;
     const DROP_FORCE   = 1400;    // click splash strength
     const REFRACTION   = 0.09;
     const SHINE        = 0.05;
@@ -95,6 +214,7 @@
     let fontReady = false;      // title stays hidden until Firstland has loaded
     let fadeStart = null;       // set when the first drag begins
     let titleAlpha = 1;
+    let aboutAlpha = 1, aboutTarget = 1, lastFrame = performance.now();   // title dims while About is open
 
     function showMessage(text) {
         hint.textContent = text;
@@ -131,7 +251,7 @@
 
     // ---------- WATER ----------
     function drop(x, y) {
-        const r = DROP_RADIUS;
+        const r = Math.round(DROP_RADIUS_MIN + Math.random() * (DROP_RADIUS_MAX - DROP_RADIUS_MIN));
         for (let j = -r; j <= r; j++) {
             for (let i = -r; i <= r; i++) {
                 const px = x + i, py = y + j;
@@ -180,9 +300,13 @@
     }
 
     function loop() {
-        if (fadeStart !== null) {
-            titleAlpha = Math.max(0, 1 - (performance.now() - fadeStart) / TITLE_FADE_MS);
-        }
+        const now = performance.now();
+        const stepA = (now - lastFrame) / ABOUT_FADE_MS;
+        lastFrame = now;
+        aboutAlpha = aboutTarget > aboutAlpha ? Math.min(aboutTarget, aboutAlpha + stepA)
+                                              : Math.max(aboutTarget, aboutAlpha - stepA);
+        const dragAlpha = fadeStart === null ? 1 : Math.max(0, 1 - (now - fadeStart) / TITLE_FADE_MS);
+        titleAlpha = dragAlpha * aboutAlpha;
         step();
         render();
         requestAnimationFrame(loop);
@@ -235,7 +359,7 @@
         return last;
     }
 
-    function revealImage(r) {
+    function revealImage(r, fadeMs = REVEAL_MS) {
         const u = nextImage();
         if (!u) return;
         const p = document.createElement("div");
@@ -246,10 +370,11 @@
         p.style.height = r.h + "px";
         p.style.backgroundImage = 'url("' + u + '")';
         if (FRAGMENT_MODE) p.style.backgroundAttachment = "fixed";
-        p.style.transition = "opacity " + REVEAL_MS + "ms ease";
+        p.style.transition = "opacity " + fadeMs + "ms ease";
         layer.appendChild(p);
         void p.offsetWidth;          // make sure the fade starts from 0
         p.style.opacity = 1;
+        return p;
     }
 
     // ---------- INTERACTION ----------
@@ -260,7 +385,10 @@
         return { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
     }
 
+    let leaving = false;         // true once a big frame has started the redirect
+
     canvas.addEventListener("pointerdown", (e) => {
+        if (leaving) return;
         dragging = true; moved = false;
         sx = ex = e.clientX; sy = ey = e.clientY;
         canvas.setPointerCapture(e.pointerId);
@@ -291,13 +419,59 @@
             playDrop();
         } else {
             const b = boxFrom();
-            if (b.w >= MIN_BOX && b.h >= MIN_BOX) revealImage(b);
+            if (b.w * b.h >= REDIRECT_COVER * innerWidth * innerHeight) redirect(b);
+            else if (b.w >= MIN_BOX && b.h >= MIN_BOX) revealImage(b);
         }
+    }
+
+    function redirect(b) {
+        leaving = true;
+        const p = revealImage(b, BIG_REVEAL_MS);
+        const veil = document.getElementById("redirect");
+        setTimeout(() => {
+            if (p) {                 // grow the image to fill the screen
+                const ease = ZOOM_MS + "ms ease-in-out";
+                p.style.transition = ["left", "top", "width", "height"].map(k => k + " " + ease).join(", ");
+                p.style.left = "0px"; p.style.top = "0px";
+                p.style.width = innerWidth + "px"; p.style.height = innerHeight + "px";
+            }
+            veil.style.transition = "opacity " + ZOOM_MS + "ms ease-in";   // black + text fade in on top
+            veil.classList.add("show");
+            setTimeout(() => { location.href = REDIRECT_URL; }, ZOOM_MS + REDIRECT_MS);
+        }, BIG_REVEAL_MS + IMAGE_HOLD_MS);
     }
     canvas.addEventListener("pointerup", (e) => endDrag(e, false));
     canvas.addEventListener("pointercancel", (e) => endDrag(e, true));
 
     window.addEventListener("resize", resize);
+
+    // ---------- ABOUT PANEL ----------
+    const about = document.getElementById("about");
+    const aboutBg = document.getElementById("about-bg");
+    const aboutBackdrop = document.getElementById("about-backdrop");
+    let aboutLast = null;
+
+    function openAbout() {
+        const pool = IMAGES.filter((n) => n !== aboutLast);   // never the same photo twice in a row
+        aboutLast = pool[Math.floor(Math.random() * pool.length)];
+        aboutBg.style.backgroundImage = 'url("' + encodeURI(IMAGE_FOLDER + aboutLast) + '")';
+        about.classList.add("open"); aboutBackdrop.classList.add("open");
+        aboutTarget = 0;
+        about.setAttribute("aria-hidden", "false");
+    }
+    function closeAbout() {
+        about.classList.remove("open"); aboutBackdrop.classList.remove("open");
+        aboutTarget = 1;
+        about.setAttribute("aria-hidden", "true");
+    }
+    document.getElementById("about-open").addEventListener("click", openAbout);
+    document.getElementById("about-close").addEventListener("click", closeAbout);
+    aboutBackdrop.addEventListener("click", closeAbout);
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAbout(); });
+
+    document.getElementById("info-dot").addEventListener("click", () => {
+        document.getElementById("info").classList.toggle("open");
+    });
 
     // ---------- START ----------
     resize();

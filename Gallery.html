@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: "Firstland";
+            src: url("Firstland%20Demo.otf") format("opentype"),
+                 url("Firstland-Demo.otf") format("opentype");
+        }
+        /* Drop a Fragment Mono SC file into this folder and it is used automatically;
+           until then the page falls back to Fragment Mono from Google Fonts. */
+        @font-face {
+            font-family: "Fragment Mono SC";
+            src: url("FragmentMonoSC-Regular.otf") format("opentype"),
+                 url("FragmentMonoSC-Regular.ttf") format("truetype");
+        }
+        :root {
+            --edge: 32px;
+            --mono: "Fragment Mono SC", "Fragment Mono", "Courier New", monospace;
+            --ui-font: 400 10px/1.3 var(--mono);
+            /* main photo size; the photo's centre sits at --mid from the top */
+            --W: clamp(260px, 36vw, 640px);
+            --H: calc(var(--W) / 1.5);
+            --T: clamp(64px, 7vw, 118px);   /* thumbnail size */
+            --mid: 44vh;
+        }
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #e8e8e8; }
+        body { animation: arrive 1s ease both; }
+        @keyframes arrive { from { opacity: 0; } }
+
+        .ui { font: var(--ui-font); letter-spacing: 0.12em; text-transform: uppercase; }
+
+        #info {
+            position: fixed; top: var(--edge); left: var(--edge); right: var(--edge);
+            text-align: center;
+        }
+        #coords {
+            position: fixed; left: 0; right: 0; text-align: center;
+            top: calc(var(--mid) - var(--H) / 2 - 30px);
+        }
+
+        /* ---------- PHOTO STRIP ---------- */
+        #strip { position: fixed; inset: 0; pointer-events: none; }
+        .photo {
+            position: absolute; left: 50%; top: var(--mid);
+            background-size: cover; background-position: center; background-color: #111;
+            pointer-events: auto; cursor: pointer;
+            will-change: transform, width, height;
+        }
+        .photo.main { cursor: default; }
+        .photo:not(.main):hover { filter: brightness(1.2); }
+
+        /* ---------- COMMENTS ---------- */
+        #comment-input {
+            position: fixed; left: 50%; transform: translateX(-50%);
+            top: calc(var(--mid) + var(--H) / 2 + 20px);
+            width: min(380px, calc(100vw - 2 * var(--edge))); height: 30px; box-sizing: border-box;
+            padding: 0 22px; border: 0; border-radius: 15px; outline: none;
+            background: rgba(255, 255, 255, 0.16); color: #e8e8e8; caret-color: #e8e8e8;
+            font: 400 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+        }
+        #comment-input::placeholder { color: rgba(232, 232, 232, 0.75); }
+        #comment-input:focus { background: rgba(255, 255, 255, 0.22); }
+        #comment-list {
+            position: fixed; left: 50%; transform: translateX(-50%);
+            top: calc(var(--mid) + var(--H) / 2 + 82px); bottom: calc(var(--edge) * 2 + 24px);
+            width: var(--W); overflow-y: auto; scrollbar-width: none;
+            font: 400 15px/1.33 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
+        }
+        #comment-list::-webkit-scrollbar { display: none; }
+        #comment-list .row { display: flex; justify-content: space-between; gap: 24px; }
+        #comment-list .row span:first-child { overflow-wrap: anywhere; }
+        #comment-list .row span:last-child { white-space: nowrap; }
+        #comment-list .row.new { animation: arrive 1.2s ease both; }
+        #comment-list .note { opacity: 0.5; font-size: 11px; }
+
+        /* ---------- BACK LINK ---------- */
+        #back {
+            position: fixed; left: var(--edge); bottom: var(--edge);
+            display: flex; align-items: baseline; gap: 10px;
+            color: #e8e8e8; text-decoration: none;
+            font: 400 13px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+            transition: opacity 0.3s ease;
+        }
+        #back em { font: 400 26px/1 Firstland, cursive; letter-spacing: 0; text-transform: none; font-style: normal; }
+        #back:hover, #back:focus-visible { opacity: 0.65; }
+
+        @media (max-width: 700px) {
+            :root { --W: calc(100vw - 2 * var(--edge)); --mid: 40vh; }
+        }
+    </style>
+</head>
+<body>
+    <p id="info" class="ui"></p>
+    <p id="coords" class="ui"></p>
+    <div id="strip"></div>
+
+    <input id="comment-input" type="text" maxlength="80" autocomplete="off"
+           placeholder="Name/describe this puddle…" aria-label="Name or describe this puddle">
+    <div id="comment-list" aria-live="polite"></div>
+
+    <a id="back" href="Under-the-cortex.html">Back to <em>under the cortex</em></a>
+
+    <script>
+    // ---------- PHOTOS ----------
+    // One entry per photo. `id` is what the comments are saved under — don't rename it once people have posted.
+    // The camera files had no location/date data left in them, so place / date below are
+    // copied from the design for every photo.
+    const PLACE = "Union Square, New York", DATE = "September 2, 2026";
+    // w / h = the photo's real pixel size (used in the top line) — leave these as they are.
+    // coords = the line of numbers shown just above the photo — replace each with that photo's own, keeping the quotes.
+    const PHOTOS = [
+        { id: "img1",  w: 5712, h: 3213, coords: "40.37294° N, 73.57292 W" },
+        { id: "img2",  w: 5712, h: 3213, coords: "49.59205 N, 76.58293 W" },
+        { id: "img3",  w: 5712, h: 3213, coords: "42.17402 N, 74.38194 W" },
+        { id: "img4",  w: 5712, h: 3213, coords: "47.57294 N, 63.16393 W" },
+        { id: "img5",  w: 4032, h: 2268, coords: "44.27349 N, 71.06736 W" },
+        { id: "img6",  w: 5712, h: 3213, coords: "50.57294 N, 40.56282 W" },
+        { id: "img7",  w: 4032, h: 2268, coords: "48.67204 N, 56.56629 W" },
+        { id: "img8",  w: 5712, h: 3213, coords: "48.42729 N, 63.62932 W" },
+        { id: "img9",  w: 4032, h: 2268, coords: "41.56739 N, 35.47294 W" },
+        { id: "img10", w: 4032, h: 2268, coords: "42.57292 N, 75.47293 W" }
+    ].map((p) => ({ place: PLACE, date: DATE, lens: "Main camera, 24 mm, f/1.78", ...p }));
+
+    const THUMB = (id) => "gallery-images/thumb/" + id + ".jpg";
+    const LARGE = (id) => "gallery-images/large/" + id + ".jpg";
+    const GAP = 30;   // px between photos in the strip
+
+    const strip = document.getElementById("strip");
+    const info = document.getElementById("info");
+    const coords = document.getElementById("coords");
+    const n = PHOTOS.length;
+    let pos = 0;        // strip position: 0 = img1 in the middle, 1 = img2 … (fractions = between photos)
+    let target = 0;     // where the strip is gliding to
+    let sel = 0;        // photo currently in the middle (rounded)
+    let settled = -1;   // photo whose comments are showing
+
+    const els = PHOTOS.map((p, i) => {
+        const el = document.createElement("div");
+        el.className = "photo";
+        el.style.backgroundImage = 'url("' + THUMB(p.id) + '")';
+        el.setAttribute("role", "button");
+        el.setAttribute("aria-label", "Show photo " + (i + 1));
+        el.addEventListener("click", () => goTo(i));
+        strip.appendChild(el);
+        return el;
+    });
+
+    function cssPx(name) {
+        const probe = document.createElement("div");
+        probe.style.width = "var(" + name + ")";
+        document.body.appendChild(probe);
+        const v = probe.getBoundingClientRect().width;
+        probe.remove();
+        return v;
+    }
+
+    let W, H, T;
+    function measure() { W = cssPx("--W"); H = cssPx("--H"); T = cssPx("--T"); }
+
+    // Draw every photo for the current (possibly fractional) strip position.
+    function layout() {
+        const step0 = W / 2 + GAP + T / 2;      // centre-to-centre: middle photo → first thumbnail
+        els.forEach((el, i) => {
+            let k = ((i - pos) % n + n) % n;    // distance from the middle, wrapped so the strip loops
+            if (k > n / 2) k -= n;
+            const a = Math.abs(k), grow = Math.max(0, 1 - a);   // 1 in the middle, 0 from one slot away
+            const x = Math.sign(k) * (a <= 1 ? a * step0 : step0 + (a - 1) * (T + GAP));
+            const w = T + (W - T) * grow, h = T + (H - T) * grow;
+            el.style.width = w + "px"; el.style.height = h + "px";
+            el.style.transform = `translate(${x - w / 2}px, ${-h / 2}px)`;
+            el.classList.toggle("main", a < 0.5);
+        });
+    }
+
+    // Caption, coordinates and sharp photo follow whichever photo is nearest the middle.
+    function updateSelected() {
+        const i = ((Math.round(pos) % n) + n) % n;
+        if (i === sel && info.textContent) return;
+        sel = i;
+        const p = PHOTOS[sel];
+        const mp = Math.round(p.w * p.h / 1e6);
+        info.textContent = `Photographed in ${p.place}, on ${p.date}. ${p.lens}, ${mp} MP (${p.w} × ${p.h}).`;
+        coords.textContent = p.coords;
+        const big = new Image();
+        big.onload = () => { els[i].style.backgroundImage = 'url("' + LARGE(p.id) + '")'; };
+        big.src = LARGE(p.id);
+    }
+
+    // Comments switch once the strip comes to rest, not on every photo it passes.
+    function settle() {
+        if (settled === sel) return;
+        settled = sel;
+        window.currentPuddle = PHOTOS[sel].id;
+        if (window.showPuddle) window.showPuddle(PHOTOS[sel].id);
+    }
+
+    // Animation loop: glide pos toward target; once input stops, snap to the nearest photo.
+    const SCROLL_SPEED = 1 / 300;   // photos moved per pixel of scrolling (higher = faster)
+    const SNAP_DELAY = 140;         // ms after the last scroll before the strip snaps into place
+    let lastInput = 0, running = false;
+    function tick() {
+        if (performance.now() - lastInput > SNAP_DELAY) target = Math.round(target);
+        pos += (target - pos) * 0.16;
+        if (Math.abs(target - pos) < 0.001) pos = target;
+        layout();
+        updateSelected();
+        if (pos === target && performance.now() - lastInput > SNAP_DELAY) { running = false; settle(); return; }
+        requestAnimationFrame(tick);
+    }
+    function run() { if (!running) { running = true; requestAnimationFrame(tick); } }
+
+    function goTo(i) {   // glide the shortest way round to photo i
+        let d = ((i - Math.round(target)) % n + n) % n;
+        if (d > n / 2) d -= n;
+        target = Math.round(target) + d;
+        run();
+    }
+
+    window.addEventListener("keydown", (e) => {
+        if (document.activeElement && document.activeElement.id === "comment-input") return;
+        if (e.key === "ArrowLeft")  { target = Math.round(target) - 1; run(); }
+        if (e.key === "ArrowRight") { target = Math.round(target) + 1; run(); }
+    });
+
+    // Scroll (mouse wheel or trackpad, up/down or sideways) moves the strip continuously.
+    // The comment list keeps its own scrolling when it has more names than fit.
+    window.addEventListener("wheel", (e) => {
+        const list = document.getElementById("comment-list");
+        if (list.contains(e.target) && list.scrollHeight > list.clientHeight) return;
+        e.preventDefault();
+        let d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (e.deltaMode === 1) d *= 30;   // some mice report lines, not pixels
+        target += d * SCROLL_SPEED;
+        lastInput = performance.now();
+        run();
+    }, { passive: false });
+
+    // Drag / swipe on touch screens moves the strip with the finger.
+    let touchX = null;
+    window.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+    window.addEventListener("touchmove", (e) => {
+        if (touchX === null) return;
+        const x = e.touches[0].clientX;
+        target -= (x - touchX) / (T + GAP);
+        touchX = x;
+        lastInput = performance.now();
+        run();
+    }, { passive: true });
+    window.addEventListener("touchend", () => { touchX = null; });
+
+    window.addEventListener("resize", () => { measure(); layout(); });
+    measure(); layout(); updateSelected(); settle();
+    </script>
+
+    <!-- ---------- COMMENTS (Firebase / Firestore) ---------- -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, where, onSnapshot }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyDP6O7AvMvOPHydirw5tAe2bEeLhXanUXw",
+      authDomain: "name-this-puddle.firebaseapp.com",
+      projectId: "name-this-puddle",
+      storageBucket: "name-this-puddle.firebasestorage.app",
+      messagingSenderId: "134482034965",
+      appId: "1:134482034965:web:b87dbea7c6307b8cbf291c"
+    });
+    const db = getFirestore(app);
+
+    const INPUT = document.querySelector("#comment-input");
+    const LIST  = document.querySelector("#comment-list");
+    let currentId = window.currentPuddle || "img1";
+    let unsubscribe = null;
+    let seen = new Set();   // comments already on screen, so only new ones fade in
+
+    const pad = n => String(n).padStart(2, "0");
+    const fmt = d => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+
+    function note(text) {
+      LIST.innerHTML = "";
+      const p = document.createElement("div");
+      p.className = "note"; p.textContent = text;
+      LIST.append(p);
+    }
+
+    function show(imageId) {
+      currentId = imageId;
+      if (unsubscribe) unsubscribe();
+      seen = new Set();
+      LIST.innerHTML = "";
+      let first = true;
+      const q = query(collection(db, "comments"), where("imageId", "==", imageId));
+      unsubscribe = onSnapshot(q, snap => {
+        const rows = snap.docs
+          .map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
+          .filter(r => r.createdAt && typeof r.text === "string")
+          .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+        if (!rows.length) { note("No names yet. Be the first."); first = false; return; }
+        LIST.innerHTML = "";
+        rows.forEach(r => {
+          const row = document.createElement("div");
+          row.className = "row" + (!first && !seen.has(r.id) ? " new" : "");
+          const t = document.createElement("span"); t.textContent = r.text;
+          const s = document.createElement("span"); s.textContent = fmt(r.createdAt.toDate());
+          row.append(t, s);
+          LIST.append(row);
+          seen.add(r.id);
+        });
+        first = false;
+      }, err => {
+        console.error(err);
+        note("Names can't load right now.");
+      });
+    }
+
+    INPUT.addEventListener("keydown", async e => {
+      if (e.key !== "Enter") return;
+      const text = INPUT.value.trim().slice(0, 80);
+      if (!text) return;
+      INPUT.value = "";
+      try {
+        await addDoc(collection(db, "comments"), { imageId: currentId, text, createdAt: serverTimestamp() });
+      } catch (err) {
+        console.error(err);
+        INPUT.value = text;   // give the text back so it isn't lost
+        INPUT.placeholder = "Couldn't save. Try again.";
+      }
+    });
+
+    window.showPuddle = show;
+    show(currentId);
+    </script>
+</body>
+</html>
