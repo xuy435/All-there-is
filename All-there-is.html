@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All There Is</title>
+    <!-- tab icon: black lettering on light browser themes, white lettering on dark ones -->
+    <link rel="icon" type="image/png" href="favicon-black.png" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="favicon.png" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="favicon-black.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: "Firstland";
+            src: url("Firstland%20Demo.otf") format("opentype"),
+                 url("Firstland-Demo.otf") format("opentype");
+        }
+        :root {
+            --edge: 32px;   /* gap from every screen edge */
+            /* ---------- TYPE SYSTEM (ranked) ---------- */
+            --t-display: 400 clamp(44px, 5.8vw, 84px)/1.1 Firstland, cursive;   /* 1 Display: 84px on desktop */
+            --t-h1:      400 26px/1.2 "EB Garamond", Garamond, "Times New Roman", serif;                                      /* 2 H1: intro poem */
+            --t-h2:      400 18px/1.3 "EB Garamond", Garamond, "Times New Roman", serif;                                      /* 3 H2: section titles, APS block, speaker names */
+            --t-body:    400 15px/1.25 "EB Garamond", Garamond, "Times New Roman", serif;                                     /* 4 Body: transcript, About text */
+            --t-small:   400 12px/1 "EB Garamond", Garamond, "Times New Roman", serif;                                        /* 5 Small: top bar, buttons, hints (in CAPS) */
+            --t-label:   400 12px/1 "EB Garamond", Garamond, "Times New Roman", serif;                                        /* 6 Label: About panel labels (CAPS, dimmed) */
+            --t-ui:      400 12px/1.6 "EB Garamond", Garamond, "Times New Roman", serif;                                      /* 7 UI: coordinates, comment names */
+            --ui-font: var(--t-small);
+        }
+        html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+        #puddle {
+            position: fixed; inset: 0; width: 100%; height: 100%;
+            cursor: crosshair; touch-action: none; display: block;
+        }
+        #layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+        .piece {
+            position: absolute;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0;
+        }
+        #frame {
+            position: fixed; display: none; pointer-events: none;
+            border: 1px solid rgba(232, 232, 232, 0.9);
+            background: rgba(232, 232, 232, 0.06);
+            box-sizing: border-box;
+        }
+        /* ---------- DRAG DEMO (plays on landing) ---------- */
+        #demo-frame {
+            position: fixed; pointer-events: none; z-index: 5; box-sizing: border-box;
+            border: 1px solid rgba(190, 190, 190, 0.85);      /* thin grey, like a Mac desktop selection */
+            background: rgba(190, 190, 190, 0.10);
+            opacity: 0; width: 0; height: 0;
+        }
+        #demo-cursor {
+            position: fixed; pointer-events: none; z-index: 6;
+            width: 23px; height: 23px; margin: -11.5px 0 0 -11.5px;   /* centred on its point */
+            opacity: 0;
+        }
+        #header {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: space-between;
+            padding: var(--edge); padding-top: calc(var(--edge) - 7px); color: #e8e8e8;   /* top trimmed so the caps sit as far from the top as from the sides */
+            font: var(--ui-font);
+            letter-spacing: 0.02em;
+            pointer-events: none;
+        }
+        #header button {
+            all: unset; cursor: pointer; pointer-events: auto;
+            text-underline-offset: 3px;
+        }
+        #header button:hover, #header button:focus-visible { text-decoration: underline; }
+
+        /* ---------- ABOUT PANEL ---------- */
+        /* while About is open: the whole page dims behind a see-through black layer */
+        #about-backdrop {
+            position: fixed; inset: 0; z-index: 40;
+            background: rgba(0, 0, 0, 0.65);   /* page overlay strength */
+            opacity: 0; visibility: hidden; transition: opacity 1.4s ease, visibility 0s 1.4s;
+        }
+        #about-backdrop.open { opacity: 1; visibility: visible; transition: opacity 1.4s ease; }
+        #about {
+            position: fixed; top: 0; left: 0; bottom: 0; z-index: 50;   /* panel on the left */
+            width: clamp(320px, 28vw, 440px);
+            background: none; color: #e8e8e8;   /* the darkness is painted by ::before so it can fade out softly */
+            transform: translateX(-100%);   /* fully off screen to the left; slides in left → right */
+            visibility: hidden;
+            transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s 1.4s;
+        }
+        #about.open {
+            transform: none; visibility: visible;
+            transition: transform 2.2s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;   /* slide in (slower) */
+        }
+        #about-close {
+            all: unset; cursor: pointer; display: block; margin-bottom: 14px;
+            font: 400 12px/1.35 "EB Garamond", Garamond, "Times New Roman", serif;   /* same as the body text */
+            letter-spacing: 0.02em;
+            text-underline-offset: 3px;
+        }
+        #about-close:hover, #about-close:focus-visible { text-decoration: underline; }
+        #about-body {
+            position: absolute; top: 88px; bottom: var(--edge);
+            left: var(--edge); right: 28px;   /* text lines up with the About button */
+            overflow-y: auto;
+            font: var(--t-body);
+            letter-spacing: 0.02em;
+        }
+        #about-body p { margin: 0 0 1.35em; }
+        #about-body a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+        #about-body a:hover, #about-body a:focus-visible { color: #fff; }
+        #about-body h4 {   /* section labels: Photographs, Sources, Type, Credits */
+            margin: 2.6em 0 0.6em; font: var(--t-label); opacity: 0.55;
+        }
+        @media (max-width: 600px) {
+            #about { width: calc(100vw - 48px); }
+        }
+        #hint {
+            position: fixed; left: 50%; bottom: var(--edge); transform: translateX(-50%);
+            color: #fff; font: var(--ui-font);
+            letter-spacing: 0.02em;
+            opacity: 0; pointer-events: none; transition: opacity 1.2s ease;
+        }
+        #hint.show { opacity: 0.6; }
+        /* Hint text: under the demo frame on landing, then centred every few seconds once you've dragged */
+        .hint-text {
+            position: fixed; z-index: 7; pointer-events: none; white-space: nowrap;
+            color: #e8e8e8; font: var(--ui-font);
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);      /* stays readable over photos */
+            opacity: 0;
+        }
+        #demo-text { transform: translateX(-50%); }
+        #center-hint { left: 50%; top: 50%; transform: translate(-50%, -50%); transition: opacity 0.8s ease; }
+        #center-hint.show { opacity: 1; }
+        @media (max-width: 600px) {
+            .hint-text { white-space: normal; text-align: center; width: calc(100vw - 2 * var(--edge)); }
+        }
+        /* secret shortcut: an invisible black dot, bottom-left; hover ripples, click goes straight to Under the Cortex */
+        #shortcut {
+            position: fixed; left: var(--edge); bottom: var(--edge); z-index: 20;
+            width: 12px; height: 12px; border-radius: 50%; background: #000; cursor: default;
+        }
+        #redirect {
+            position: fixed; inset: 0; z-index: 100; background: #000;
+            display: flex; align-items: center; justify-content: center;
+            color: #e8e8e8; font: var(--t-display);
+            text-align: center; padding: 0 16px;
+            opacity: 0; pointer-events: none; transition: opacity 0.8s ease;
+        }
+        #redirect.show { opacity: 1; pointer-events: auto; }
+        /* Subtitle: fades away 5s after the page opens, then only shows while the mouse is over it */
+        #tagline { pointer-events: auto; transition: opacity 1.2s ease; }
+        body.tagline-away #tagline { opacity: 0; }
+        body.tagline-away #tagline:hover { opacity: 1; transition: opacity 0.3s ease; }
+        /* Headers and labels in caps; body / long text stays in normal case */
+        #header, .hint-text, #about-close, #about-body h4 { text-transform: uppercase; letter-spacing: 0.08em; }
+        /* About button → panel title: slides left with the panel (same timing), back again on close */
+        #header #about-open { position: relative; transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1); }
+        body.about-open #header #about-open { transform: translateX(var(--about-dx, 0px)); transition: transform 2.2s cubic-bezier(0.22, 1, 0.36, 1); text-decoration: none; }
+        body.about-open #header { z-index: 60; }
+        /* panel darkness: solid behind the text, then a long gradual fade past the panel's edge,
+           with a blur that rises and falls across the same zone, so no edge line shows */
+        #about::before, #about::after {
+            content: ""; position: absolute; top: 0; bottom: 0; z-index: -1; pointer-events: none;
+        }
+        #about::before {
+            left: 0; right: -260px;
+            background: linear-gradient(to right,
+                rgba(0, 0, 0, 0.8) 0, rgba(0, 0, 0, 0.8) calc(100% - 320px),
+                rgba(0, 0, 0, 0.55) calc(100% - 210px), rgba(0, 0, 0, 0.22) calc(100% - 100px), rgba(0, 0, 0, 0) 100%);
+        }
+        #about::after {
+            left: calc(100% - 60px); width: 320px;
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            -webkit-mask-image: linear-gradient(to right, transparent, #000 35%, transparent);
+                    mask-image: linear-gradient(to right, transparent, #000 35%, transparent);
+        }
+        body.about-open #header > :not(#about-open) { opacity: 0.4; transition: opacity 0.8s ease; }   /* top bar dims with the page */
+        /* header: fades to grey 5s after landing; white on hover; the About title stays white while its panel is open */
+        body.ui-dim #header { color: #7a7a7a; }
+        body.ui-dim #header a:hover, body.ui-dim #header a:focus-visible,
+        body.ui-dim #header button:hover, body.ui-dim #header button:focus-visible { color: #fff; }
+        #header a, #header button { transition: color 0.3s ease; }
+        body.about-open #header #about-open { color: #fff; }
+    </style>
+</head>
+<body class="ui-dim">   <!-- header is grey from the very first frame (white on hover) -->
+    <canvas id="puddle"></canvas>
+    <div id="layer"></div>
+    <div id="frame"></div>
+    <div id="demo-frame"></div>
+    <svg id="demo-cursor" viewBox="0 0 23 23" aria-hidden="true">
+        <!-- crosshair: dark outline under a thin white cross -->
+        <path d="M11.5 1v8M11.5 14v8M1 11.5h8M14 11.5h8" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+        <path d="M11.5 1v8M11.5 14v8M1 11.5h8M14 11.5h8" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+    <div id="header">
+        <button id="about-open" type="button">About</button>
+        <span id="tagline">An interactive visual experience about perception</span>
+        <span></span>   <!-- empty: keeps the subtitle centred -->
+    </div>
+    <div id="hint"></div>
+    <div id="demo-text" class="hint-text">Drag a frame across almost the entire screen to see everything.</div>
+    <div id="center-hint" class="hint-text">Drag a frame across almost the entire screen to see everything.</div>
+    <div id="about-backdrop"></div>
+    <aside id="about" aria-label="About" aria-hidden="true">
+        <div id="about-body">
+            <p>All There Is is an interactive visual–audio experience about perception: how what we know, and where we stand, shapes what we see.</p>
+            <p>A puddle never shows the whole street. It shows a sample of it, bent by angle, light, time of day, and the eye looking down. Two people can stand over the same puddle and see different things, and both are right. The site works the same way. Each frame reveals only a fragment, and the picture gets clearer only as more is uncovered. It’s a small reminder to hold off on judging until more of the picture is in view.</p>
+
+            <h4>Photographs</h4>
+            <p>Taken in Union Square, New York, on 2 September 2026. Main camera, 24 mm, f/1.78, 9MP (4032 × 2268).</p>
+
+            <h4>Sources</h4>
+            <p>“What You Know Changes What and How You See,” Under the Cortex, Association for Psychological Science, 15 December 2022. Ludmila Nunes in conversation with Dick Dubbelde.</p>
+
+            <h4>Type</h4>
+            <p>Firstland by Matra Creative<br>EB Garamond by Georg Duffner</p>
+
+            <h4>Credits</h4>
+            <p>Designed and developed by Yue Xu<br>Core 3: Studio, Parsons School of Design, Fall 2026<br>Supervised by <a href="https://abbychen.work/" target="_blank" rel="noopener">Abby Chen</a></p>
+
+            <h4>Contact</h4>
+            <p><a href="mailto:yuexu0827@gmail.com">yuexu0827@gmail.com</a></p>
+        </div>
+    </aside>
+    <a id="shortcut" href="Under-the-cortex.html" aria-label="Under the Cortex"></a>   <!-- secret shortcut -->
+    <div id="redirect">Unlocked: the whole picture.<br>Redirecting to Under the Cortex…</div>
+
+    <script>
+    // ---------- SETTINGS (tweak these) ----------
+    const TITLE         = "All There Is";
+    const TITLE_COLOR   = "#e8e8e8";
+    const TITLE_WIDTH   = 0.92;   // title width as a fraction of the screen width
+    const TITLE_FADE_MS = 500;    // title disappears this fast once you drag a frame
+    const ABOUT_FADE_MS = 1400;   // title fade out / back in while the About panel opens / closes
+    const TITLE_DELAY   = 800;    // on opening the page: wait this long before the title starts to appear…
+    const TITLE_IN_MS   = 3000;   // …then fade it in over this long
+    const REVEAL_MS     = 2500;   // how long each image takes to fade in
+    const MIN_BOX       = 24;     // smallest box (px) that counts as a frame
+    const REDIRECT_COVER = 0.85;  // a box covering this fraction of the screen (or more) leaves the page
+    const REDIRECT_URL   = "Under-the-cortex.html";
+    // big-frame sequence (total = sum of these four, 5s)
+    const BIG_REVEAL_MS  = 600;   // black block fades in inside the frame
+    const IMAGE_HOLD_MS  = 1000;  // black block stays as-is
+    const ZOOM_MS        = 1400;  // block grows to full screen while the "Redirecting" text fades in
+    const REDIRECT_MS    = 2000;  // fully black "Redirecting" screen shows before leaving
+    const FRAGMENT_MODE = false;  // false = whole photo fitted into the box; true = box is a window onto a full-screen photo
+
+    // Photos: same folder as this file. Change IMAGE_FOLDER (e.g. "images/") if you move them.
+    const IMAGE_FOLDER = "";
+    const IMAGES = [
+        "img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg", "img5.jpg",
+        "img6.jpg", "img7.jpg", "img8.jpg", "img9.jpg", "img10.jpg"
+    ];
+
+    // (the drop sound on every click is handled by ripple.js)
+    const SCALE        = 0.75;    // water resolution (lower = faster, higher = sharper title)
+    const DAMPING      = 6;       // higher = ripples last longer
+    const DROP_RADIUS_MIN = 8;    // click splash size: each click picks a random size in this range
+    const DROP_RADIUS_MAX = 44;
+    const DROP_FORCE   = 1400;    // click splash strength
+    const REFRACTION   = 0.09;
+    const SHINE        = 0.05;
+    const CHROMA       = 0;       // colour split in the ripples: 0 = clean silver/white, higher = rainbow edges
+
+    // ---------- SETUP ----------
+    const canvas = document.getElementById("puddle");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const hint = document.getElementById("hint");
+    const frame = document.getElementById("frame");
+    const layer = document.getElementById("layer");
+
+    let w, h, size, src, out, outData, cur, prev;
+    let fontReady = false;      // title stays hidden until Firstland has loaded
+    let fadeStart = null;       // set when the first drag begins
+    let titleAlpha = 1;
+    let aboutAlpha = 1, aboutTarget = 1, lastFrame = performance.now();   // title dims while About is open
+
+    function showMessage(text) {
+        hint.textContent = text;
+        hint.classList.add("show");
+    }
+
+    function drawSource(off) {
+        const c = off.getContext("2d");
+        c.fillStyle = "#000";
+        c.fillRect(0, 0, w, h);
+        if (!fontReady) return;
+        c.fillStyle = TITLE_COLOR;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.font = "100px Firstland, cursive";
+        const measured = c.measureText(TITLE).width;
+        c.font = (100 * (w * TITLE_WIDTH) / measured) + "px Firstland, cursive";
+        c.fillText(TITLE, w / 2, h / 2);
+    }
+
+    function resize() {
+        canvas.width  = Math.max(2, Math.floor(window.innerWidth  * SCALE));
+        canvas.height = Math.max(2, Math.floor(window.innerHeight * SCALE));
+        w = canvas.width; h = canvas.height; size = w * h;
+        const off = document.createElement("canvas");
+        off.width = w; off.height = h;
+        drawSource(off);
+        src = off.getContext("2d").getImageData(0, 0, w, h).data;
+        out = ctx.createImageData(w, h);
+        outData = out.data;
+        cur  = new Int32Array(size);
+        prev = new Int32Array(size);
+    }
+
+    // ---------- WATER ----------
+    function drop(x, y, size) {   // size: optional fixed splash radius; random otherwise
+        const r = size || Math.round(DROP_RADIUS_MIN + Math.random() * (DROP_RADIUS_MAX - DROP_RADIUS_MIN));
+        for (let j = -r; j <= r; j++) {
+            for (let i = -r; i <= r; i++) {
+                const px = x + i, py = y + j;
+                if (px < 1 || py < 1 || px >= w - 1 || py >= h - 1) continue;
+                const d = Math.sqrt(i * i + j * j);
+                if (d <= r) cur[py * w + px] -= DROP_FORCE * (1 - d / r);
+            }
+        }
+        return r / SCALE;   // splash radius in screen pixels
+    }
+
+    function step() {
+        for (let y = 1; y < h - 1; y++) {
+            let i = y * w + 1;
+            for (let x = 1; x < w - 1; x++, i++) {
+                let v = ((cur[i - 1] + cur[i + 1] + cur[i - w] + cur[i + w]) >> 1) - prev[i];
+                v -= v >> DAMPING;
+                prev[i] = v;
+            }
+        }
+        const t = cur; cur = prev; prev = t;
+    }
+
+    function clamp(v, max) { return v < 0 ? 0 : v > max ? max : v; }
+
+    function render() {
+        const wm = w - 1, hm = h - 1;
+        const a = titleAlpha;
+        for (let y = 1; y < hm; y++) {
+            for (let x = 1; x < wm; x++) {
+                const i = y * w + x;
+                const dx = cur[i - 1] - cur[i + 1];
+                const dy = cur[i - w] - cur[i + w];
+                const ox = dx * REFRACTION, oy = dy * REFRACTION;
+                const rx = clamp((x + ox * (1 + CHROMA)) | 0, wm), ry = clamp((y + oy * (1 + CHROMA)) | 0, hm);
+                const gx = clamp((x + ox) | 0, wm),                gy = clamp((y + oy) | 0, hm);
+                const bx = clamp((x + ox * (1 - CHROMA)) | 0, wm), by = clamp((y + oy * (1 - CHROMA)) | 0, hm);
+                const shine = (Math.abs(dx) + Math.abs(dy)) * SHINE * 1.5;
+                const o = i * 4;
+                outData[o]     = src[(ry * w + rx) * 4]     * a + shine;
+                outData[o + 1] = src[(gy * w + gx) * 4 + 1] * a + shine;
+                outData[o + 2] = src[(by * w + bx) * 4 + 2] * a + shine;
+                outData[o + 3] = 255;
+            }
+        }
+        ctx.putImageData(out, 0, 0);
+    }
+
+    function loop() {
+        const now = performance.now();
+        const stepA = (now - lastFrame) / ABOUT_FADE_MS;
+        lastFrame = now;
+        aboutAlpha = aboutTarget > aboutAlpha ? Math.min(aboutTarget, aboutAlpha + stepA)
+                                              : Math.max(aboutTarget, aboutAlpha - stepA);
+        const dragAlpha = fadeStart === null ? 1 : Math.max(0, 1 - (now - fadeStart) / TITLE_FADE_MS);
+        const t = titleShownAt === null ? 0 : (now - titleShownAt - TITLE_DELAY) / TITLE_IN_MS;
+        const appear = Math.min(1, Math.max(0, t));
+        titleAlpha = dragAlpha * aboutAlpha * appear * appear * (3 - 2 * appear);   // smooth fade-in on opening
+        step();
+        render();
+        requestAnimationFrame(loop);
+    }
+
+    // ---------- IMAGES ----------
+    const urls = [];           // photos that loaded successfully
+    let pending = IMAGES.length;
+
+    IMAGES.forEach((name) => {
+        const url = encodeURI(IMAGE_FOLDER + name);
+        const im = new Image();
+        im.onload = () => { urls.push(url); pending--; };
+        im.onerror = () => {
+            console.warn("Photo not found:", url);
+            if (--pending === 0 && !urls.length) {
+                showMessage("Can't find the photos \u2014 check the file names and folder");
+            }
+        };
+        im.src = url;
+    });
+
+    // shuffled "bag": every photo appears once before any repeats
+    let bag = [], last = null;
+    function nextImage() {
+        if (!bag.length) {
+            bag = urls.slice();
+            for (let i = bag.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [bag[i], bag[j]] = [bag[j], bag[i]];
+            }
+            if (bag.length > 1 && bag[bag.length - 1] === last) bag.unshift(bag.pop());
+        }
+        if (!bag.length) return null;
+        last = bag.pop();
+        return last;
+    }
+
+    function revealImage(r, fadeMs = REVEAL_MS) {
+        const u = nextImage();
+        if (!u) return;
+        const p = document.createElement("div");
+        p.className = "piece";
+        p.style.left = r.x + "px";
+        p.style.top = r.y + "px";
+        p.style.width = r.w + "px";
+        p.style.height = r.h + "px";
+        p.style.backgroundImage = 'url("' + u + '")';
+        if (FRAGMENT_MODE) p.style.backgroundAttachment = "fixed";
+        p.style.transition = "opacity " + fadeMs + "ms ease";
+        layer.appendChild(p);
+        void p.offsetWidth;          // make sure the fade starts from 0
+        p.style.opacity = 1;
+        return p;
+    }
+
+    // ---------- INTERACTION ----------
+    let dragging = false, moved = false, sx = 0, sy = 0, ex = 0, ey = 0;
+    const DRAG_MIN = 6;
+
+    function boxFrom() {
+        return { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
+    }
+
+    let leaving = false;         // true once a big frame has started the redirect
+
+    canvas.addEventListener("pointerdown", (e) => {
+        if (leaving) return;
+        dragging = true; moved = false;
+        sx = ex = e.clientX; sy = ey = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        ex = e.clientX; ey = e.clientY;
+        if (!moved && Math.hypot(ex - sx, ey - sy) >= DRAG_MIN) {
+            moved = true;
+            frame.style.display = "block";
+            if (fadeStart === null) fadeStart = performance.now();   // title disappears
+            userDragged();
+        }
+        if (moved) {
+            const b = boxFrom();
+            frame.style.left = b.x + "px"; frame.style.top = b.y + "px";
+            frame.style.width = b.w + "px"; frame.style.height = b.h + "px";
+        }
+    });
+
+    // Ripple on the title water and, on top, over any photos
+    function rippleAt(x, y, size) {
+        const r = drop(Math.floor(x * SCALE), Math.floor(y * SCALE), size);
+        if (window.Ripple) Ripple.drop(x, y, r);
+    }
+
+    function endDrag(e, cancelled) {
+        if (!dragging) return;
+        dragging = false;
+        frame.style.display = "none";
+        if (cancelled) return;
+        // every release — a plain click or the end of a drag — drops a ripple where the pointer lets go
+        // (the drop sound for every click is played by ripple.js)
+        rippleAt(e.clientX, e.clientY);
+        if (moved) {
+            const b = boxFrom();
+            if (b.w * b.h >= REDIRECT_COVER * innerWidth * innerHeight) redirect(b);
+            else if (b.w >= MIN_BOX && b.h >= MIN_BOX) revealImage(b);
+        }
+    }
+
+    function redirect(b) {
+        leaving = true;
+        // the big frame fills with black instead of a photo, then grows into the black "Redirecting" screen
+        const p = document.createElement("div");
+        p.className = "piece";
+        p.style.cssText = `left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;background:#000;` +
+                          `transition:opacity ${BIG_REVEAL_MS}ms ease;`;
+        layer.appendChild(p);
+        void p.offsetWidth;
+        p.style.opacity = 1;
+        const veil = document.getElementById("redirect");
+        setTimeout(() => {
+            if (p) {                 // grow the black block to fill the screen
+                const ease = ZOOM_MS + "ms ease-in-out";
+                p.style.transition = ["left", "top", "width", "height"].map(k => k + " " + ease).join(", ");
+                p.style.left = "0px"; p.style.top = "0px";
+                p.style.width = innerWidth + "px"; p.style.height = innerHeight + "px";
+            }
+            veil.style.transition = "opacity " + ZOOM_MS + "ms ease-in";   // black + text fade in on top
+            veil.classList.add("show");
+            setTimeout(() => { location.href = REDIRECT_URL; }, ZOOM_MS + REDIRECT_MS);
+        }, BIG_REVEAL_MS + IMAGE_HOLD_MS);
+    }
+    canvas.addEventListener("pointerup", (e) => endDrag(e, false));
+    canvas.addEventListener("pointercancel", (e) => endDrag(e, true));
+
+    window.addEventListener("resize", resize);
+
+    // ---------- ABOUT PANEL ----------
+    const about = document.getElementById("about");
+    const aboutBackdrop = document.getElementById("about-backdrop");
+
+    function openAbout() {
+        setAboutSlide();
+        about.classList.add("open"); aboutBackdrop.classList.add("open");
+        document.body.classList.add("about-open");
+        aboutTarget = 0;
+        about.setAttribute("aria-hidden", "false");
+    }
+    function closeAbout() {
+        about.classList.remove("open"); aboutBackdrop.classList.remove("open");
+        document.body.classList.remove("about-open");
+        aboutTarget = 1;
+        about.setAttribute("aria-hidden", "true");
+    }
+    // the About button itself slides left with the panel and becomes its title; clicking it again closes
+    const aboutBtn = document.getElementById("about-open");
+    function setAboutSlide() {
+        const edge = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--edge")) || 32;
+        const body = document.getElementById("about-body");
+        const target = body.offsetLeft;     // left edge of the panel's text (panel sits at the left edge)
+        const start = edge;                 // where the button normally sits
+        document.documentElement.style.setProperty("--about-dx", (target - start) + "px");
+    }
+    aboutBtn.addEventListener("click", () => about.classList.contains("open") ? closeAbout() : openAbout());
+    window.addEventListener("resize", setAboutSlide);
+    aboutBackdrop.addEventListener("click", closeAbout);
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAbout(); });
+
+
+    // ---------- DRAG DEMO ----------
+    // On landing, a ghost crosshair drags a thin grey frame, with the hint text under it.
+    // A click hides the current demo; once the visitor drags a frame themselves, the demo stops for good
+    // and the hint shows in the centre of the screen every few seconds instead.
+    const DEMO_DELAY  = 4000;   // ms after landing before the demo starts
+    const DEMO_REPEAT = 7000;   // ms between replays while the visitor hasn't dragged yet
+    const DEMO_TIMES  = 3;      // how many times it plays at most
+    const DEMO_HOLD   = 2500;   // ms the finished frame + text stay on screen
+    const HINT_EVERY  = 7000;   // after the first drag: centred hint every this many ms…
+    const HINT_SHOW   = 2500;   // …staying this long each time
+    const demoFrame = document.getElementById("demo-frame");
+    const demoCursor = document.getElementById("demo-cursor");
+    const demoText = document.getElementById("demo-text");
+    const centerHint = document.getElementById("center-hint");
+    let demoStopped = false, demoTimer = null, demoRaf = null, demoPlays = 0, hintTimer = null;
+
+    function setDemoOpacity(v, fade) {
+        [demoFrame, demoCursor, demoText].forEach((el) => {
+            el.style.transition = fade ? "opacity 0.3s ease" : "none";
+            el.style.opacity = v;
+        });
+    }
+    function hideDemoPlay() {          // a click: hide what's showing, keep later replays
+        cancelAnimationFrame(demoRaf);
+        setDemoOpacity(0, true);
+        clearTimeout(demoTimer);
+        if (!demoStopped && demoPlays < DEMO_TIMES) demoTimer = setTimeout(playDemo, DEMO_REPEAT);
+    }
+    function stopDemo() {              // the visitor dragged a frame: no more demos
+        demoStopped = true;
+        clearTimeout(demoTimer); cancelAnimationFrame(demoRaf);
+        setDemoOpacity(0, true);
+    }
+    const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    function playDemo() {
+        if (demoStopped || leaving) return;
+        demoPlays++;
+        const W = innerWidth, H = innerHeight;
+        const ax = W * 0.30, ay = H * 0.32, bx = W * 0.66, by = H * 0.70;   // drag from A to B
+        // timeline (ms): cursor fades in, pause, drag, hold (hint text shows here), everything fades out
+        const T_IN = 400, T_WAIT = 350, T_DRAG = 1500, T_HOLD = DEMO_HOLD, T_OUT = 500;
+        const start = performance.now();
+        let rippled = false;   // one ripple per play, at the moment the cursor "lets go"
+        setDemoOpacity(0, false);
+        function frame(now) {
+            if (demoStopped) return;
+            const t = now - start;
+            let cx = ax, cy = ay, curA = 1, boxA = 0, k = 0;
+            if (!rippled && t >= T_IN + T_WAIT + T_DRAG) {   // release: drop a ripple + sound where the cursor stops
+                rippled = true;
+                rippleAt(bx, by, DROP_RADIUS_MAX);   // a full-size ripple so it's easy to see
+                if (window.Ripple) Ripple.sound();      // and the drop sound
+            }
+            if (t < T_IN) curA = Math.max(0, t / T_IN);
+            else if (t < T_IN + T_WAIT) curA = 1;
+            else if (t < T_IN + T_WAIT + T_DRAG) { k = ease((t - T_IN - T_WAIT) / T_DRAG); boxA = 1; }
+            else if (t < T_IN + T_WAIT + T_DRAG + T_HOLD) { k = 1; boxA = 1; }
+            else if (t < T_IN + T_WAIT + T_DRAG + T_HOLD + T_OUT) {
+                k = 1; boxA = curA = 1 - (t - T_IN - T_WAIT - T_DRAG - T_HOLD) / T_OUT;
+            } else {
+                setDemoOpacity(0, false);
+                if (demoPlays < DEMO_TIMES) demoTimer = setTimeout(playDemo, DEMO_REPEAT);
+                return;
+            }
+            cx = ax + (bx - ax) * k; cy = ay + (by - ay) * k;
+            demoCursor.style.left = cx + "px"; demoCursor.style.top = cy + "px";
+            demoCursor.style.opacity = curA;
+            demoFrame.style.left = ax + "px"; demoFrame.style.top = ay + "px";
+            demoFrame.style.width = (cx - ax) + "px"; demoFrame.style.height = (cy - ay) + "px";
+            demoFrame.style.opacity = boxA;
+            // hint text: only once the frame's shape is fixed (after release), centred under its bottom edge
+            const tRel = t - (T_IN + T_WAIT + T_DRAG);
+            demoText.style.left = (ax + bx) / 2 + "px"; demoText.style.top = (by + 14) + "px";
+            demoText.style.opacity = tRel < 0 ? 0 : Math.min(1, tRel / 300) * (k === 1 ? Math.min(1, boxA) : 0);
+            demoRaf = requestAnimationFrame(frame);
+        }
+        demoRaf = requestAnimationFrame(frame);
+    }
+
+    // After the visitor's first drag: hint in the centre of the screen, every HINT_EVERY ms
+    function showCenterHint() {
+        if (leaving) return;
+        if (!dragging && !about.classList.contains("open")) {
+            centerHint.classList.add("show");
+            setTimeout(() => centerHint.classList.remove("show"), HINT_SHOW);
+        }
+        hintTimer = setTimeout(showCenterHint, HINT_EVERY);
+    }
+    function userDragged() {
+        if (!demoStopped) stopDemo();
+        if (hintTimer === null) hintTimer = setTimeout(showCenterHint, HINT_EVERY);
+    }
+
+    canvas.addEventListener("pointerdown", () => { hideDemoPlay(); centerHint.classList.remove("show"); });
+    demoTimer = setTimeout(playDemo, DEMO_DELAY);
+
+    // Secret shortcut: hovering ripples (once per hover), clicking skips straight to Under the Cortex
+    const shortcut = document.getElementById("shortcut");
+    shortcut.addEventListener("mouseenter", () => {
+        const r = shortcut.getBoundingClientRect();
+        rippleAt(r.left + r.width / 2, r.top + r.height / 2);
+    });
+
+    // ---------- START ----------
+    resize();
+    let titleShownAt = null;   // when the title font was ready, so the fade-in starts from there
+    const fontDone = () => { fontReady = true; titleShownAt = performance.now(); resize(); };
+    document.fonts.load("100px Firstland").then(fontDone, fontDone);
+    loop();
+    </script>
+    
+    <script src="ripple.js" data-auto="false"></script>   <!-- ripples above the photos + drop sound on every click -->
+    <script>
+    // Subtitle fades away after 5 seconds (hover over its spot to see it again)
+    setTimeout(() => document.body.classList.add("tagline-away"), 5000);
+    </script>
+</body>
+</html>
